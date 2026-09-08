@@ -34,11 +34,23 @@ import urllib.error
 import urllib.request
 from collections import deque
 
-from .base import Canal, MensajeEntrante
+from .base import Adjunto, Canal, MensajeEntrante
 
 # Cuánto esperamos a que Chatwoot conteste. Corre en el mismo servidor que
 # el agente, así que si tarda más que esto es porque algo anda mal.
 ESPERA_DE_RED = 20
+
+# Bajar un archivo tarda más que pedir un JSON, sobre todo un audio largo.
+ESPERA_DE_DESCARGA = 60
+
+# Tope de tamaño por archivo. No es un límite del modelo: es para que una
+# persona que manda un video de 80 MB no deje sin memoria al contenedor.
+MAXIMO_DE_ADJUNTO = 15 * 1024 * 1024
+
+# Qué adjuntos vale la pena mandarle al modelo. Los que no están acá se
+# descartan en silencio: un .zip no aporta nada a la conversación y encima
+# se paga como tokens.
+TIPOS_QUE_ENTIENDE = {"image", "audio"}
 
 
 class ErrorDeChatwoot(Exception):
@@ -80,8 +92,11 @@ class Chatwoot(Canal):
         """Convierte un evento del webhook en algo que el agente entiende.
 
         Devuelve None si el evento no es un mensaje que tengamos que mirar:
-        otro tipo de evento, o un mensaje sin texto (un audio, una foto, un
-        adjunto suelto) que el agente todavía no sabe leer.
+        otro tipo de evento, o un mensaje que no trae ni texto ni adjuntos.
+
+        Un mensaje **sin texto pero con una foto** es válido y hay que
+        atenderlo: en WhatsApp la gente manda la foto del producto sola,
+        sin escribir nada. Antes se descartaba y el bot quedaba mudo.
         """
         if evento.get("event") != "message_created":
             return None
@@ -89,8 +104,9 @@ class Chatwoot(Canal):
         conversacion = evento.get("conversation") or {}
         id_conversacion = conversacion.get("id")
         texto = (evento.get("content") or "").strip()
+        adjuntos = _adjuntos_de(evento)
 
-        if not id_conversacion or not texto:
+        if not id_conversacion or (not texto and not adjuntos):
             return None
 
         return MensajeEntrante(
@@ -100,7 +116,35 @@ class Chatwoot(Canal):
             conversacion=str(id_conversacion),
             identificador=str(evento.get("id") or ""),
             datos=evento,
+            adjuntos=adjuntos,
         )
+
+    def descargar(self, adjunto: Adjunto) -> tuple[bytes, str]:
+        """Baja el archivo de un adjunto. Devuelve (contenido, mime).
+
+        Va con el token de la API porque en Chatwoot los archivos de las
+        conversaciones no son públicos: sin el header, la descarga vuelve
+        con una pantalla de login en vez del archivo.
+        """
+        pedido = urllib.request.Request(
+            adjunto.url,
+            headers={"api_access_token": self.token},
+        )
+
+        with urllib.request.urlopen(pedido, timeout=ESPERA_DE_DESCARGA) as respuesta:
+            contenido = respuesta.read()
+            # El mime que declara el servidor le gana al que adivinamos
+            # nosotros por la extensión: WhatsApp manda los audios como
+            # .oga, .ogg o .m4a según el teléfono.
+            mime = respuesta.headers.get("Content-Type", "") or adjunto.mime
+
+        if len(contenido) > MAXIMO_DE_ADJUNTO:
+            raise ErrorDeChatwoot(
+                f"El archivo pesa {len(contenido) // 1024} KB y el tope son "
+                f"{MAXIMO_DE_ADJUNTO // 1024} KB."
+            )
+
+        return contenido, (mime.split(";")[0].strip() or "application/octet-stream")
 
     def deberia_responder(self, mensaje: MensajeEntrante) -> bool:
         """Si el agente tiene que contestar este mensaje o dejarlo pasar.
@@ -248,6 +292,35 @@ class Chatwoot(Canal):
 
 
 # -- Ayudantes ----------------------------------------------------------------
+
+
+def _adjuntos_de(evento: dict) -> list[Adjunto]:
+    """Saca las fotos, audios y archivos que vinieron con el mensaje.
+
+    Chatwoot los manda en `attachments`, cada uno con su `data_url` y un
+    `file_type` que ya viene clasificado ("image", "audio", "video", "file").
+    Nos quedamos con lo que el modelo sabe leer y descartamos el resto: un
+    .zip o un .exe no tiene nada que aportarle a la conversación.
+    """
+    adjuntos: list[Adjunto] = []
+
+    for crudo in evento.get("attachments") or []:
+        if not isinstance(crudo, dict):
+            continue
+
+        # data_url es el archivo original; thumb_url sería la miniatura, que
+        # para leer el texto de una etiqueta no alcanza.
+        url = crudo.get("data_url") or crudo.get("file_url") or ""
+        if not url:
+            continue
+
+        tipo = str(crudo.get("file_type") or "file").strip().lower()
+        if tipo not in TIPOS_QUE_ENTIENDE:
+            continue
+
+        adjuntos.append(Adjunto(url=url, tipo=tipo))
+
+    return adjuntos
 
 
 def _tipo_de_mensaje(evento: dict) -> str:

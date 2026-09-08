@@ -32,7 +32,7 @@ clase y nada más — el webhook no se entera.
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 
 class BufferDeMensajes:
@@ -41,12 +41,13 @@ class BufferDeMensajes:
     def __init__(
         self,
         segundos: float,
-        al_completar: Callable[[str, str], Awaitable[None]],
+        al_completar: Callable[[str, str, list], Awaitable[None]],
         tope: float | None = None,
     ) -> None:
         """
         `segundos`     cuánto se espera desde el último mensaje
-        `al_completar` qué hacer con la ráfaga junta: (conversacion, texto)
+        `al_completar` qué hacer con la ráfaga junta:
+                       (conversacion, texto, adjuntos)
         `tope`         cuánto se puede estirar la espera como máximo
         """
         self.segundos = max(0.0, float(segundos))
@@ -57,17 +58,27 @@ class BufferDeMensajes:
         self.tope = float(tope) if tope is not None else self.segundos * 3
 
         self._pendientes: dict[str, list[str]] = {}
+        # Las fotos y audios de la ráfaga van aparte del texto, pero se
+        # sueltan juntos: alguien que manda la foto y después escribe "cuánto
+        # sale?" mandó una sola consulta, no dos.
+        self._adjuntos: dict[str, list[Any]] = {}
         self._relojes: dict[str, asyncio.Task] = {}
         self._arrancó_en: dict[str, float] = {}
 
-    async def agregar(self, conversacion: str, texto: str) -> None:
+    async def agregar(
+        self, conversacion: str, texto: str, adjuntos: list | None = None
+    ) -> None:
         """Suma un mensaje a la ráfaga de esa conversación."""
         # Sin espera configurada no hay ráfaga que juntar: se contesta y listo.
         if self.segundos <= 0:
-            await self.al_completar(conversacion, texto)
+            await self.al_completar(conversacion, texto, list(adjuntos or []))
             return
 
-        self._pendientes.setdefault(conversacion, []).append(texto)
+        if texto:
+            self._pendientes.setdefault(conversacion, []).append(texto)
+
+        if adjuntos:
+            self._adjuntos.setdefault(conversacion, []).extend(adjuntos)
 
         ahora = asyncio.get_running_loop().time()
         self._arrancó_en.setdefault(conversacion, ahora)
@@ -96,15 +107,19 @@ class BufferDeMensajes:
         self._relojes.pop(conversacion, None)
         self._arrancó_en.pop(conversacion, None)
         partes = self._pendientes.pop(conversacion, [])
+        adjuntos = self._adjuntos.pop(conversacion, [])
 
-        if not partes:
+        # Una foto sola, sin una palabra escrita, también es una consulta.
+        if not partes and not adjuntos:
             return
 
-        await self.al_completar(conversacion, "\n".join(partes))
+        await self.al_completar(conversacion, "\n".join(partes), adjuntos)
 
     def pendientes(self, conversacion: str) -> int:
         """Cuántos mensajes hay esperando. Lo usan los tests y el /salud."""
-        return len(self._pendientes.get(conversacion, []))
+        return len(self._pendientes.get(conversacion, [])) + len(
+            self._adjuntos.get(conversacion, [])
+        )
 
     async def vaciar(self) -> None:
         """Suelta todo lo que esté esperando. Se llama al apagar el servidor.
@@ -118,8 +133,14 @@ class BufferDeMensajes:
         self._arrancó_en.clear()
 
         pendientes = self._pendientes
+        adjuntos = self._adjuntos
         self._pendientes = {}
+        self._adjuntos = {}
 
-        for conversacion, partes in pendientes.items():
-            if partes:
-                await self.al_completar(conversacion, "\n".join(partes))
+        for conversacion in {*pendientes, *adjuntos}:
+            partes = pendientes.get(conversacion, [])
+            archivos = adjuntos.get(conversacion, [])
+            if partes or archivos:
+                await self.al_completar(
+                    conversacion, "\n".join(partes), archivos
+                )

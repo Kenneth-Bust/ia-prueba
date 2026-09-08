@@ -24,6 +24,9 @@ permite enchufarlo a cualquier canal sin tocar una línea de acá adentro.
 
 from __future__ import annotations
 
+import base64
+import logging
+import time
 from dataclasses import dataclass
 from typing import Iterator
 
@@ -37,6 +40,38 @@ from .memoria import crear_memoria
 from .modelos import crear_modelo
 from .prompts import leer_prompt
 from .respuesta import partir_respuesta
+
+registro = logging.getLogger("agente")
+
+# Cuántas veces reintentamos cuando el proveedor está sobrecargado, y cuánto
+# esperamos entre intento e intento.
+#
+# Esto no es paranoia: con la cuenta en el nivel gratuito de Gemini, tres de
+# cada cuatro llamadas volvían con un 503 "high demand". Con créditos el
+# problema casi desaparece, pero un pico puede pasar en cualquier momento y
+# del otro lado hay un cliente esperando. Sin reintento, ese cliente recibe
+# un mensaje de error; con reintento, recibe la respuesta dos segundos más
+# tarde y no se entera de nada.
+REINTENTOS = 3
+ESPERAS = (1.0, 2.0, 4.0)
+
+# Los errores que vale la pena reintentar: el proveedor está saturado o nos
+# está frenando, pero el pedido en sí está bien. Un 400 (pedido mal armado)
+# o un 401 (clave equivocada) no se arreglan reintentando, así que esos
+# salen derecho.
+SENALES_TRANSITORIAS = (
+    "503",
+    "429",
+    "overloaded",
+    "unavailable",
+    "high demand",
+    "rate limit",
+    "resource_exhausted",
+    "deadline",
+    "timeout",
+    "internal error",
+    "500",
+)
 
 
 @dataclass
@@ -190,18 +225,63 @@ class Agente:
 
     # -- Lo que usa todo el mundo --------------------------------------------
 
-    def responder(self, texto: str, conversacion: str = "local") -> Respuesta:
+    def responder(
+        self,
+        texto: str,
+        conversacion: str = "local",
+        archivos: list[tuple[bytes, str]] | None = None,
+    ) -> Respuesta:
         """Le mandás un mensaje, te devuelve la respuesta completa.
 
         `conversacion` es el thread_id de LangGraph: cada valor distinto es
         una conversación separada, con su propia memoria. En Telegram o
         WhatsApp acá va el número o el chat_id de la persona.
+
+        `archivos` son las fotos o audios que mandó la persona, como pares
+        (contenido, mime). El canal los baja y el agente los mete en el
+        mensaje: el modelo los mira igual que el texto.
         """
-        salida = self.grafo.invoke(
-            {"messages": [HumanMessage(texto)]},
-            config=self._config_hilo(conversacion),
-        )
+        entrada = _mensaje_humano(texto, archivos)
+
+        salida = self._invocar_con_reintentos(entrada, conversacion)
         return _a_respuesta(salida["messages"][-1], self.config.modelo)
+
+    def _invocar_con_reintentos(self, entrada, conversacion: str) -> dict:
+        """Llama al grafo y reintenta si el proveedor está sobrecargado.
+
+        Solo reintenta lo que tiene sentido reintentar (ver
+        SENALES_TRANSITORIAS). Cualquier otro error sale tal cual y sin
+        demora: el AGENTS.md pide que el error del proveedor llegue entero
+        a quien lo tiene que ver, y esconderlo detrás de tres reintentos que
+        van a fallar igual solo hace esperar a la persona.
+        """
+        ultimo: Exception | None = None
+
+        for intento in range(REINTENTOS):
+            try:
+                return self.grafo.invoke(
+                    {"messages": [entrada]},
+                    config=self._config_hilo(conversacion),
+                )
+            except Exception as e:
+                if not _vale_reintentar(e) or intento == REINTENTOS - 1:
+                    raise
+
+                ultimo = e
+                espera = ESPERAS[min(intento, len(ESPERAS) - 1)]
+                registro.warning(
+                    "[%s] %s: reintento %s de %s en %ss",
+                    conversacion,
+                    type(e).__name__,
+                    intento + 1,
+                    REINTENTOS - 1,
+                    espera,
+                )
+                time.sleep(espera)
+
+        # Inalcanzable: el for sale por return o por raise. Está por si
+        # alguien toca los números de arriba y deja el rango en cero.
+        raise ultimo if ultimo else RuntimeError("no se pudo responder")
 
     def responder_en_vivo(
         self, texto: str, conversacion: str = "local"
@@ -252,14 +332,19 @@ class Agente:
     # -- Utilidades -----------------------------------------------------------
 
     def responder_partido(
-        self, texto: str, conversacion: str = "local"
+        self,
+        texto: str,
+        conversacion: str = "local",
+        archivos: list[tuple[bytes, str]] | None = None,
     ) -> list[str]:
         """Como responder(), pero la respuesta ya viene partida en mensajes.
 
         Es lo que van a usar Telegram y WhatsApp: en mensajería una respuesta
         larga se manda en varios globos cortos, no en un ladrillo.
         """
-        return partir_respuesta(self.responder(texto, conversacion).texto)
+        return partir_respuesta(
+            self.responder(texto, conversacion, archivos).texto
+        )
 
     def historial(self, conversacion: str = "local") -> list:
         """Los mensajes guardados de una conversación."""
@@ -280,6 +365,59 @@ class Agente:
 
 
 # -- Ayudantes ----------------------------------------------------------------
+
+
+def _vale_reintentar(error: Exception) -> bool:
+    """Si este error es un tropiezo pasajero del proveedor o algo definitivo.
+
+    Se mira el texto del error y no el tipo porque cada proveedor tira una
+    excepción distinta (ClientError, ResourceExhausted, APIStatusError) y
+    todas terminan con el código adentro del mensaje. Mirar el texto es feo
+    pero funciona igual con los tres, y no se rompe si mañana cambian la
+    jerarquía de excepciones.
+    """
+    detalle = f"{type(error).__name__} {error}".lower()
+    return any(senal in detalle for senal in SENALES_TRANSITORIAS)
+
+
+def _mensaje_humano(texto: str, archivos: list[tuple[bytes, str]] | None):
+    """Arma el mensaje de la persona, con sus fotos y audios si mandó.
+
+    Sin archivos devuelve el mensaje de siempre (un string), que es el 95%
+    de los casos y el camino que ya estaba probado.
+
+    Con archivos arma el formato multimodal de LangChain: una lista de
+    bloques donde cada archivo viaja en base64 con su mime. Es el mismo
+    formato para imagen y para audio; lo que cambia es el `type`.
+    """
+    if not archivos:
+        return HumanMessage(texto)
+
+    bloques: list[dict] = []
+
+    for contenido, mime in archivos:
+        clase = "audio" if mime.startswith("audio") else "image"
+        bloques.append(
+            {
+                "type": clase,
+                "source_type": "base64",
+                "mime_type": mime,
+                "data": base64.b64encode(contenido).decode("ascii"),
+            }
+        )
+
+    # El texto va al final, después de los archivos: así la pregunta queda
+    # pegada a lo último que leyó el modelo. Si la persona mandó la foto
+    # sola, le ponemos algo para que el modelo sepa qué se espera de él —
+    # un mensaje con una imagen y ni una palabra lo deja adivinando.
+    bloques.append(
+        {
+            "type": "text",
+            "text": texto or "(la persona mandó esto sin escribir nada)",
+        }
+    )
+
+    return HumanMessage(content=bloques)
 
 
 def _recortar(mensajes: list, tope: int) -> list:

@@ -27,6 +27,28 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class Adjunto:
+    """Un archivo que mandó la persona: una foto, un audio, un documento.
+
+    Guarda la URL y no el contenido a propósito. Bajar el archivo cuesta
+    tiempo y memoria, y la mayoría de los eventos que llegan se descartan
+    antes de necesitarlo (los que manda el propio bot, los repetidos). Se
+    baja recién cuando se va a responder.
+    """
+
+    url: str
+    # "image", "audio", "video", "file" — lo que dice el canal.
+    tipo: str = "file"
+    mime: str = ""
+
+    def es_imagen(self) -> bool:
+        return self.tipo == "image"
+
+    def es_audio(self) -> bool:
+        return self.tipo == "audio"
+
+
+@dataclass
 class MensajeEntrante:
     """Un mensaje que llega de afuera, ya traducido a algo que el agente entiende."""
 
@@ -34,6 +56,8 @@ class MensajeEntrante:
     conversacion: str          # el thread_id: quién habla
     identificador: str = ""    # el id del mensaje en el canal, para no repetirlo
     datos: dict = field(default_factory=dict)  # lo crudo, por si el canal lo necesita
+    # Las fotos y audios que vinieron con el mensaje. Vacío casi siempre.
+    adjuntos: list[Adjunto] = field(default_factory=list)
 
 
 class Canal(ABC):

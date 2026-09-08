@@ -73,28 +73,44 @@ def crear_app(
     # y el segundo pisaría lo que guardó el primero.
     candados: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def responder(conversacion: str, texto: str) -> None:
+    async def responder(
+        conversacion: str, texto: str, adjuntos: list | None = None
+    ) -> None:
         """Le pasa la ráfaga al agente y manda la respuesta por Chatwoot."""
         async with candados[conversacion]:
-            registro.info("[%s] %s", conversacion, texto.replace("\n", " | ")[:200])
+            registro.info(
+                "[%s] %s%s",
+                conversacion,
+                texto.replace("\n", " | ")[:200],
+                f"  [+{len(adjuntos)} adjunto(s)]" if adjuntos else "",
+            )
 
             # El "escribiendo..." y el agente son código bloqueante (urllib y
             # el modelo). Van a un hilo aparte para no trabar el servidor:
             # mientras este mensaje se piensa, los demás siguen entrando.
             await asyncio.to_thread(canal.escribiendo, conversacion, True)
 
+            archivos = await asyncio.to_thread(
+                _bajar, canal, conversacion, adjuntos or []
+            )
+
             try:
                 mensajes = await asyncio.to_thread(
-                    agente.responder_partido, texto, conversacion
+                    agente.responder_partido, texto, conversacion, archivos
                 )
             except Exception as e:
-                # El error del proveedor no se esconde: se lo decimos a la
-                # persona y queda en los logs. Pero no volteamos el servidor,
-                # porque atiende a varias personas y una falla con una no
-                # puede dejar sin respuesta a las demás.
-                aviso = f"{type(e).__name__}: {e}"
-                registro.error("[%s] %s", conversacion, aviso)
-                mensajes = [f"Se me rompió algo: {aviso}"]
+                # El detalle del error va al log, donde lo puede leer quien
+                # mantiene esto. A la persona que está del otro lado no: un
+                # cliente que llega de un anuncio y recibe un stack trace se
+                # va, y encima no entiende qué hacer con eso. Se le pide que
+                # repita, que es lo único accionable que puede hacer.
+                registro.error(
+                    "[%s] %s: %s", conversacion, type(e).__name__, e
+                )
+                mensajes = [
+                    "Perdón, se me complicó la conexión y no pude procesar tu "
+                    "mensaje. ¿Me lo repetís?"
+                ]
 
             try:
                 await asyncio.to_thread(canal.enviar, conversacion, mensajes)
@@ -163,8 +179,33 @@ def crear_app(
             return JSONResponse({"estado": "ignorado"})
 
         # Se suma a la ráfaga y contestamos ya. Lo que sigue pasa solo.
-        await buffer.agregar(entrante.conversacion, entrante.texto)
+        await buffer.agregar(
+            entrante.conversacion, entrante.texto, entrante.adjuntos
+        )
 
         return JSONResponse({"estado": "recibido"})
 
     return app
+
+
+def _bajar(canal: Chatwoot, conversacion: str, adjuntos: list) -> list:
+    """Baja las fotos y audios que mandó la persona.
+
+    Devuelve pares (contenido, mime) listos para el modelo.
+
+    Por qué se traga el error de una descarga: si la foto no se puede bajar,
+    la alternativa es no contestarle nada a la persona. Preferimos responder
+    con el texto que sí tenemos —el modelo va a decir que no pudo ver la
+    imagen, que es la verdad— antes que quedarnos mudos. Queda en los logs.
+    """
+    archivos: list[tuple[bytes, str]] = []
+
+    for adjunto in adjuntos:
+        try:
+            archivos.append(canal.descargar(adjunto))
+        except Exception as e:
+            registro.error(
+                "[%s] no se pudo bajar el adjunto: %s", conversacion, e
+            )
+
+    return archivos

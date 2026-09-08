@@ -355,3 +355,79 @@ def test_la_transmision_se_puede_leer_dos_veces():
     assert primero == "hola que tal"
     assert segundo == "hola que tal", "la segunda lectura no puede venir vacía"
     assert t.resumen.texto == "hola que tal", "el resumen no se tiene que pisar"
+
+
+# -- Reintentos cuando el proveedor está saturado -----------------------------
+#
+# Con la cuenta de Gemini en el nivel gratuito, 3 de cada 4 llamadas volvían
+# con un 503 "high demand". Sin reintento, ese 503 se convierte en un mensaje
+# de error para un cliente que llegó de un anuncio pago.
+
+
+def test_reintenta_cuando_el_proveedor_esta_saturado():
+    from agente.agente import _vale_reintentar
+
+    saturado = [
+        Exception("503 UNAVAILABLE: The model is overloaded"),
+        Exception("429 RESOURCE_EXHAUSTED: rate limit"),
+        Exception("This model is currently experiencing high demand"),
+        Exception("500 Internal error"),
+    ]
+
+    for error in saturado:
+        assert _vale_reintentar(error) is True, error
+
+
+def test_no_reintenta_lo_que_no_se_arregla_reintentando():
+    """Una clave vencida o un pedido mal armado fallan igual las tres veces."""
+    from agente.agente import _vale_reintentar
+
+    definitivos = [
+        Exception("401 UNAUTHENTICATED: API key not valid"),
+        Exception("400 INVALID_ARGUMENT: bad request"),
+        Exception("404 model not found"),
+    ]
+
+    for error in definitivos:
+        assert _vale_reintentar(error) is False, error
+
+
+# -- El mensaje con fotos y audios --------------------------------------------
+
+
+def test_sin_archivos_el_mensaje_es_el_de_siempre():
+    """El 95% de los mensajes son texto: ese camino no tiene que cambiar."""
+    from agente.agente import _mensaje_humano
+
+    assert _mensaje_humano("hola", None).content == "hola"
+    assert _mensaje_humano("hola", []).content == "hola"
+
+
+def test_la_foto_viaja_en_base64_con_su_mime():
+    from agente.agente import _mensaje_humano
+
+    mensaje = _mensaje_humano("que es esto?", [(b"\x89PNG...", "image/png")])
+    bloques = mensaje.content
+
+    assert bloques[0]["type"] == "image"
+    assert bloques[0]["mime_type"] == "image/png"
+    assert bloques[0]["source_type"] == "base64"
+    # El texto va al final, pegado a lo último que leyó el modelo.
+    assert bloques[-1] == {"type": "text", "text": "que es esto?"}
+
+
+def test_el_audio_se_manda_como_audio_y_no_como_imagen():
+    from agente.agente import _mensaje_humano
+
+    mensaje = _mensaje_humano("", [(b"OggS...", "audio/ogg")])
+
+    assert mensaje.content[0]["type"] == "audio"
+
+
+def test_la_foto_sin_texto_igual_le_dice_algo_al_modelo():
+    """Una imagen y ni una palabra deja al modelo adivinando qué se espera."""
+    from agente.agente import _mensaje_humano
+
+    mensaje = _mensaje_humano("", [(b"\x89PNG", "image/png")])
+
+    assert mensaje.content[-1]["text"], "el modelo necesita algún texto"

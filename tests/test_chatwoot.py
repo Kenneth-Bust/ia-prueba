@@ -265,7 +265,7 @@ def test_tres_mensajes_seguidos_son_una_sola_respuesta():
     """El caso de todos los días: "hola" / "una consulta" / "por el precio"."""
     sueltos = []
     buffer = BufferDeMensajes(
-        0.05, lambda c, t: _anotar(sueltos, c, t)
+        0.05, lambda c, t, a=None: _anotar(sueltos, c, t)
     )
 
     juntar(buffer, ["hola", "una consulta", "por el precio"])
@@ -277,7 +277,7 @@ def test_tres_mensajes_seguidos_son_una_sola_respuesta():
 def test_cada_conversacion_junta_la_suya():
     """Si se mezclaran, una persona recibiría el mensaje de otra."""
     sueltos = []
-    buffer = BufferDeMensajes(0.05, lambda c, t: _anotar(sueltos, c, t))
+    buffer = BufferDeMensajes(0.05, lambda c, t, a=None: _anotar(sueltos, c, t))
 
     async def correr():
         await buffer.agregar("111", "soy uno")
@@ -292,7 +292,7 @@ def test_cada_conversacion_junta_la_suya():
 def test_sin_espera_contesta_derecho():
     """BUFFER_SEGUNDOS=0 apaga el buffer."""
     sueltos = []
-    buffer = BufferDeMensajes(0, lambda c, t: _anotar(sueltos, c, t))
+    buffer = BufferDeMensajes(0, lambda c, t, a=None: _anotar(sueltos, c, t))
 
     asyncio.run(buffer.agregar("12", "hola"))
 
@@ -308,7 +308,7 @@ def test_el_tope_corta_la_espera_infinita():
     """
     sueltos = []
     buffer = BufferDeMensajes(
-        0.20, lambda c, t: _anotar(sueltos, c, t), tope=0.30
+        0.20, lambda c, t, a=None: _anotar(sueltos, c, t), tope=0.30
     )
 
     # Seis mensajes cada 0,1s = 0,6s de charla. Con la espera de 0,2s
@@ -322,7 +322,7 @@ def test_el_tope_corta_la_espera_infinita():
 def test_al_apagar_no_se_pierde_lo_que_estaba_esperando():
     """Un deploy justo en esos segundos dejaría a alguien sin respuesta."""
     sueltos = []
-    buffer = BufferDeMensajes(30, lambda c, t: _anotar(sueltos, c, t))
+    buffer = BufferDeMensajes(30, lambda c, t, a=None: _anotar(sueltos, c, t))
 
     async def correr():
         await buffer.agregar("12", "hola")
@@ -404,8 +404,15 @@ def test_su_propia_respuesta_no_dispara_otra():
     assert canal.envios() == []
 
 
-def test_si_el_modelo_falla_se_le_avisa_a_la_persona():
-    """Un error con una persona no puede dejarla esperando en silencio."""
+def test_si_el_modelo_falla_se_le_avisa_a_la_persona(caplog):
+    """Un error con una persona no puede dejarla esperando en silencio.
+
+    Pero tampoco se le manda el error crudo: del otro lado hay un cliente
+    que llegó de un anuncio, y un "ClientError: 503 UNAVAILABLE" no le dice
+    nada y encima lo espanta. El detalle va al log, que es donde lo puede
+    leer quien mantiene esto; a la persona se le pide que repita, que es lo
+    único que puede hacer.
+    """
     from test_agente import agente_falso
 
     canal = ChatwootFalso()
@@ -415,7 +422,14 @@ def test_si_el_modelo_falla_se_le_avisa_a_la_persona():
         web.post("/chatwoot/secreto", json=evento("hola"))
 
     assert len(canal.envios()) == 1
-    assert "rompió" in canal.envios()[0]
+
+    aviso = canal.envios()[0]
+    assert "repetís" in aviso
+    # Nada de tripas del error en el chat del cliente.
+    assert "Error" not in aviso and "Exception" not in aviso
+
+    # Pero en el log sí tiene que estar, o no hay forma de diagnosticarlo.
+    assert any(r.levelname == "ERROR" for r in caplog.records)
 
 
 def test_el_salud_contesta():
@@ -427,3 +441,104 @@ def test_el_salud_contesta():
 
     assert respuesta.status_code == 200
     assert respuesta.json()["estado"] == "ok"
+
+
+# -- Fotos y audios -----------------------------------------------------------
+#
+# Lo que más llega por WhatsApp después del texto. Antes se descartaban en
+# silencio: la persona mandaba la foto del producto y el bot no contestaba
+# nada. Estos tests son para que eso no vuelva a pasar.
+
+
+def evento_con_adjunto(tipo="image", texto="", url="https://cw.test/a.jpg"):
+    """Un mensaje con una foto o un audio, como lo manda Chatwoot."""
+    crudo = evento(texto=texto)
+    crudo["attachments"] = [
+        {"id": 9, "file_type": tipo, "data_url": url, "thumb_url": url}
+    ]
+    return crudo
+
+
+def test_la_foto_sola_sin_texto_se_atiende():
+    """El caso que dejaba mudo al bot: la foto sin una palabra escrita."""
+    entrante = ChatwootFalso().traducir(evento_con_adjunto())
+
+    assert entrante is not None, "una foto sola también es una consulta"
+    assert entrante.texto == ""
+    assert len(entrante.adjuntos) == 1
+    assert entrante.adjuntos[0].es_imagen()
+
+
+def test_la_foto_con_texto_trae_las_dos_cosas():
+    entrante = ChatwootFalso().traducir(
+        evento_con_adjunto(texto="tienen este control?")
+    )
+
+    assert entrante.texto == "tienen este control?"
+    assert len(entrante.adjuntos) == 1
+
+
+def test_el_audio_se_reconoce_como_audio():
+    entrante = ChatwootFalso().traducir(
+        evento_con_adjunto(tipo="audio", url="https://cw.test/a.oga")
+    )
+
+    assert entrante.adjuntos[0].es_audio()
+
+
+def test_los_adjuntos_que_el_modelo_no_lee_se_descartan():
+    """Un .zip no aporta nada y se paga como tokens."""
+    entrante = ChatwootFalso().traducir(evento_con_adjunto(tipo="file"))
+
+    assert entrante is None, "sin texto y sin adjunto util, no hay nada que hacer"
+
+
+def test_un_adjunto_sin_url_no_rompe():
+    crudo = evento(texto="mira")
+    crudo["attachments"] = [{"id": 9, "file_type": "image"}]
+
+    entrante = ChatwootFalso().traducir(crudo)
+
+    assert entrante.texto == "mira"
+    assert entrante.adjuntos == []
+
+
+def test_el_buffer_junta_la_foto_con_el_texto_que_viene_despues():
+    """Alguien manda la foto y después escribe: es UNA consulta, no dos."""
+    from agente.canales.base import Adjunto
+
+    sueltos = []
+
+    async def anotar(conversacion, texto, adjuntos):
+        sueltos.append((conversacion, texto, len(adjuntos)))
+
+    buffer = BufferDeMensajes(0.05, anotar)
+
+    async def correr():
+        await buffer.agregar("12", "", [Adjunto(url="https://cw.test/a.jpg")])
+        await buffer.agregar("12", "cuanto sale?")
+        await asyncio.sleep(0.25)
+
+    asyncio.run(correr())
+
+    assert sueltos == [("12", "cuanto sale?", 1)]
+
+
+def test_el_buffer_suelta_la_foto_sola():
+    """Sin texto, la ráfaga tiene que salir igual."""
+    from agente.canales.base import Adjunto
+
+    sueltos = []
+
+    async def anotar(conversacion, texto, adjuntos):
+        sueltos.append((conversacion, texto, len(adjuntos)))
+
+    buffer = BufferDeMensajes(0.05, anotar)
+
+    async def correr():
+        await buffer.agregar("12", "", [Adjunto(url="https://cw.test/a.jpg")])
+        await asyncio.sleep(0.25)
+
+    asyncio.run(correr())
+
+    assert sueltos == [("12", "", 1)]
