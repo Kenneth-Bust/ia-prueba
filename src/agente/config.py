@@ -67,6 +67,10 @@ class Config:
     chatwoot_webhook_token: str = ""
     # Cuánto espera juntando la ráfaga antes de contestar (ver buffer.py).
     buffer_segundos: int = 8
+    # Si las respuestas partidas salen con pausa entre globo y globo, como
+    # las escribiría una persona. En false salen todas juntas, que es más
+    # rápido pero se nota que es un bot (ver respuesta.pausa_de_tipeo).
+    ritmo_humano: bool = True
 
     @classmethod
     def desde_entorno(
@@ -128,6 +132,7 @@ class Config:
                 os.getenv("CHATWOOT_WEBHOOK_TOKEN") or ""
             ).strip(),
             buffer_segundos=_entero("BUFFER_SEGUNDOS", 8),
+            ritmo_humano=_booleano("RITMO_HUMANO", True),
         )
 
 

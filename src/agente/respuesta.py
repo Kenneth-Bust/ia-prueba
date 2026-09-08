@@ -30,6 +30,38 @@ MAXIMO_DE_MENSAJES = 5
 _FIN_DE_ORACION = re.compile(r"(?<=[.!?…])\s+")
 
 
+# -- El ritmo de escritura ----------------------------------------------------
+#
+# Partir la respuesta en varios globos no alcanza para que parezca escrita por
+# una persona: si los dos salen en la misma décima de segundo, el efecto es al
+# revés y se nota más que si fuera un solo mensaje largo. Nadie escribe dos
+# párrafos a la vez.
+#
+# Así que entre mensaje y mensaje se espera lo que tardaría alguien en
+# tipearlo, con el "escribiendo..." encendido mientras tanto.
+
+# Cuántos caracteres por segundo "escribe" el agente. 28 es rápido pero
+# creíble: alguien que tipea bien en el teléfono.
+CARACTERES_POR_SEGUNDO = 28
+
+# La pausa nunca baja de esto (un mensaje de dos palabras igual toma un
+# instante) ni sube de esto otro (nadie espera 8 segundos por la segunda
+# mitad de una respuesta).
+PAUSA_MINIMA = 1.2
+PAUSA_MAXIMA = 4.0
+
+
+def pausa_de_tipeo(texto: str) -> float:
+    """Cuánto esperar antes de mandar este mensaje, en segundos.
+
+    Proporcional al largo: un "dale, te espero" sale casi enseguida y un
+    párrafo de tres renglones se hace esperar. Es la diferencia entre que
+    parezca una persona y que parezca un formulario.
+    """
+    segundos = len(texto or "") / CARACTERES_POR_SEGUNDO
+    return max(PAUSA_MINIMA, min(segundos, PAUSA_MAXIMA))
+
+
 def partir_respuesta(
     texto: str,
     largo_de_un_mensaje: int = LARGO_DE_UN_MENSAJE,

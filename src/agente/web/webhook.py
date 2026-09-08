@@ -39,6 +39,7 @@ from ..agente import Agente
 from ..canales.buffer import BufferDeMensajes
 from ..canales.chatwoot import Chatwoot
 from ..config import Config
+from ..respuesta import pausa_de_tipeo
 
 registro = logging.getLogger("agente.webhook")
 
@@ -113,7 +114,9 @@ def crear_app(
                 ]
 
             try:
-                await asyncio.to_thread(canal.enviar, conversacion, mensajes)
+                await _enviar_con_ritmo(
+                    canal, conversacion, mensajes, config.ritmo_humano
+                )
             except Exception as e:
                 # Acá ya no hay a quién avisarle: el canal de salida es
                 # justamente el que falló. Queda en los logs.
@@ -186,6 +189,38 @@ def crear_app(
         return JSONResponse({"estado": "recibido"})
 
     return app
+
+
+async def _enviar_con_ritmo(
+    canal: Chatwoot,
+    conversacion: str,
+    mensajes: list[str],
+    ritmo: bool = True,
+) -> None:
+    """Manda los mensajes uno por uno, con el tiempo de escribirlos en el medio.
+
+    Partir la respuesta en varios globos era la mitad del truco. La otra
+    mitad es esta: si los globos salen todos juntos, la persona ve dos
+    mensajes aparecer en el mismo instante y eso no lo hace nadie. Delata al
+    bot más que una sola respuesta larga.
+
+    Entonces, entre uno y otro: se prende el "escribiendo...", se espera lo
+    que tardaría alguien en tipear el que viene, y recién ahí sale.
+
+    Con un solo mensaje esto no hace nada, que es el caso más común.
+    """
+    for i, texto in enumerate(mensajes):
+        await asyncio.to_thread(canal.enviar, conversacion, [texto])
+
+        siguiente = mensajes[i + 1] if i + 1 < len(mensajes) else None
+        if siguiente is None or not ritmo:
+            continue
+
+        # El "escribiendo..." tiene que estar prendido DURANTE la pausa, no
+        # antes de mandar: es lo que hace que la espera se lea como alguien
+        # tecleando y no como que el bot se colgó.
+        await asyncio.to_thread(canal.escribiendo, conversacion, True)
+        await asyncio.sleep(pausa_de_tipeo(siguiente))
 
 
 def _bajar(canal: Chatwoot, conversacion: str, adjuntos: list) -> list:

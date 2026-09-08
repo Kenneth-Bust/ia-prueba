@@ -57,3 +57,36 @@ def test_nunca_manda_mas_del_maximo():
 
 def test_normaliza_los_saltos_de_windows():
     assert partir_respuesta("Hola.\r\n\r\nChau.") == ["Hola.", "Chau."]
+
+
+# -- El ritmo de escritura ----------------------------------------------------
+#
+# Partir la respuesta en globos no alcanza: si salen todos en la misma décima
+# de segundo, se nota más que es un bot. Entre uno y otro va el tiempo que
+# tardaría alguien en tipearlo.
+
+
+def test_un_mensaje_largo_se_hace_esperar_mas_que_uno_corto():
+    from agente.respuesta import pausa_de_tipeo
+
+    corto = pausa_de_tipeo("dale")
+    largo = pausa_de_tipeo("a" * 200)
+
+    assert largo > corto, "la pausa tiene que ser proporcional al largo"
+
+
+def test_la_pausa_nunca_es_cero_ni_eterna():
+    """Sin mínimo se ven dos mensajes juntos; sin máximo, la gente se va."""
+    from agente.respuesta import PAUSA_MAXIMA, PAUSA_MINIMA, pausa_de_tipeo
+
+    assert pausa_de_tipeo("") >= PAUSA_MINIMA
+    assert pausa_de_tipeo("ok") >= PAUSA_MINIMA
+    assert pausa_de_tipeo("x" * 10_000) <= PAUSA_MAXIMA
+
+
+def test_la_pausa_de_un_mensaje_tipico_es_creible():
+    """Un mensaje de WhatsApp normal: entre uno y cuatro segundos."""
+    from agente.respuesta import pausa_de_tipeo
+
+    tipico = "Con ese presupuesto te recomiendo la RX 7600 a US$ 275."
+    assert 1.0 <= pausa_de_tipeo(tipico) <= 4.0

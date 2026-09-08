@@ -108,8 +108,12 @@ def test_los_otros_eventos_se_dejan_pasar(nombre):
     assert ChatwootFalso().traducir(evento(nombre=nombre)) is None
 
 
-def test_un_mensaje_sin_texto_se_deja_pasar():
-    """Un audio o una foto sueltos: el agente todavía no sabe leer eso."""
+def test_un_mensaje_sin_texto_ni_adjuntos_se_deja_pasar():
+    """Sin texto y sin archivo no hay nada que contestar.
+
+    Ojo: un mensaje sin texto pero CON una foto sí se atiende — eso se
+    prueba en test_la_foto_sola_sin_texto_se_atiende, más abajo.
+    """
     assert ChatwootFalso().traducir(evento(texto="")) is None
     assert ChatwootFalso().traducir(evento(texto="   ")) is None
 
@@ -542,3 +546,62 @@ def test_el_buffer_suelta_la_foto_sola():
     asyncio.run(correr())
 
     assert sueltos == [("12", "", 1)]
+
+
+def test_los_mensajes_salen_de_a_uno_y_con_escribiendo_en_el_medio():
+    """Dos globos en el mismo instante delatan al bot más que uno largo."""
+    from agente.web.webhook import _enviar_con_ritmo
+
+    canal = ChatwootFalso()
+    orden = []
+
+    def anotar_enviar(conversacion, mensajes):
+        orden.append(("enviar", mensajes[0]))
+
+    def anotar_escribiendo(conversacion, encendido=True):
+        orden.append(("escribiendo", encendido))
+
+    canal.enviar = anotar_enviar
+    canal.escribiendo = anotar_escribiendo
+
+    async def correr():
+        # ritmo=False para que el test no espere de verdad: lo que importa
+        # es el orden de las llamadas, no dormir 3 segundos.
+        await _enviar_con_ritmo(canal, "12", ["primero", "segundo"], ritmo=False)
+
+    asyncio.run(correr())
+
+    assert orden == [("enviar", "primero"), ("enviar", "segundo")]
+
+
+def test_con_ritmo_se_prende_el_escribiendo_entre_globo_y_globo():
+    from agente.web.webhook import _enviar_con_ritmo
+
+    canal = ChatwootFalso()
+    orden = []
+    canal.enviar = lambda c, m: orden.append(("enviar", m[0]))
+    canal.escribiendo = lambda c, e=True: orden.append(("escribiendo", e))
+
+    async def correr():
+        await _enviar_con_ritmo(canal, "12", ["uno", "dos"], ritmo=True)
+
+    asyncio.run(correr())
+
+    # Entre los dos envíos tiene que haber pasado el "escribiendo".
+    assert orden[0] == ("enviar", "uno")
+    assert orden[1] == ("escribiendo", True)
+    assert orden[2] == ("enviar", "dos")
+
+
+def test_con_un_solo_mensaje_no_hay_pausa_ni_escribiendo_de_mas():
+    """El caso más común: una sola respuesta, sin ceremonia."""
+    from agente.web.webhook import _enviar_con_ritmo
+
+    canal = ChatwootFalso()
+    orden = []
+    canal.enviar = lambda c, m: orden.append(("enviar", m[0]))
+    canal.escribiendo = lambda c, e=True: orden.append(("escribiendo", e))
+
+    asyncio.run(_enviar_con_ritmo(canal, "12", ["unico"], ritmo=True))
+
+    assert orden == [("enviar", "unico")]
