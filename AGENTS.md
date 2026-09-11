@@ -9,6 +9,36 @@ Si sos una persona: leé el `README.md`, es el que está escrito para vos.
 
 ---
 
+## ⚠️ Esto ya está en producción — leelo antes de tocar nada desplegado
+
+Este repo dejó de ser solo material didáctico. Hay **dos bots atendiendo en
+un VPS**, uno con WhatsApp real conectado, y una agencia montando clientes
+encima.
+
+**Antes de tocar cualquier cosa desplegada, leé [docs/operacion.md](docs/operacion.md).**
+Ahí está el mapa de lo que corre de verdad: dominios, identificadores de
+Coolify, cómo se reparten las cuentas de Chatwoot, la oferta comercial, y
+—sobre todo— las trampas que ya costaron horas y no conviene repetir.
+
+Lo mínimo antes de seguir leyendo:
+
+- **`agente-ia` corre `main` y atiende WhatsApp real.** Del otro lado hay
+  prospectos de la agencia: no despliegues sin probar.
+- **`prompts/sistema.md` es la vidriera del negocio**, no un ejemplo. Vende
+  el servicio de la agencia con precios reales.
+- **Un contenedor no alcanza la IP pública del propio servidor**: los DSN de
+  Postgres van con el host interno de Docker. Este error dejó a los dos bots
+  en bucle de reinicio.
+- **Cambiar el prompt no alcanza**: las conversaciones abiertas arrastran la
+  identidad anterior. Después de un cambio grande va
+  `python scripts/olvidar.py`.
+- La rama `piloto-demo` suma el filtro por cuenta y bandeja, y **todavía no
+  está mergeada a `main`**.
+
+El detalle del piloto multicliente está en [docs/piloto-demo.md](docs/piloto-demo.md).
+
+---
+
 ## Qué es esto
 
 **AgentKit.** Un agente de IA conversacional que corre en la máquina
