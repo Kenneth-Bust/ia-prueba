@@ -183,16 +183,36 @@ ver la respuesta en Chatwoot. La bandeja API no envía mensajes a WhatsApp.
 - [x] Pruebas sin proveedor: origen cruzado, duplicados, privados, salientes y humano.
 - [x] Prompt demo independiente y catálogo marcado como ficticio.
 - [x] Base demo y rol propio creados; persistencia entre procesos verificada.
+- [x] Capacidad del VPS revisada: KVM 2, CPU 18 %, memoria 29 %, disco 10/100 GB.
+- [x] Rama `piloto-demo` publicada; `agente-ia` sigue apuntando a `main`.
+- [x] Aplicación `bot-demo` creada en Coolify, sin desplegar, con health check
+      `/salud` y 15 de 18 variables cargadas.
 - [ ] Cuenta Cliente Demo y usuarios exclusivos creados en Chatwoot.
 - [ ] Bandeja API Pruebas Demo y webhook único configurados.
-- [ ] Capacidad del VPS revisada; rama y despliegue bot-demo preparados.
 - [ ] DNS y HTTPS del subdominio verificados.
 - [ ] Usuario de prueba sin acceso a la cuenta de la agencia.
 - [ ] Respuesta real de Gemini en la bandeja demo.
 - [ ] Reinicio de bot-demo con agencia disponible y memoria persistente.
 
-El último estado refleja únicamente lo comprobado: aún no se crearon los
-recursos de Chatwoot ni el despliegue porque faltan los accesos administrativos.
+### Estado al 11 de septiembre de 2026
+
+Faltan tres variables en `bot-demo`, y las tres salen de crear la cuenta en
+Chatwoot: `CHATWOOT_CUENTA_ID`, `CHATWOOT_BANDEJA_ID` y `CHATWOOT_TOKEN`.
+Sin ellas el contenedor arranca y se queda sin atender ninguna bandeja.
+
+Falta también el registro DNS `bot-demo`. El conector de Hostinger quedó sin
+autorización, así que hay que crearlo desde hPanel: A, `bot-demo`,
+`2.25.112.244`, TTL 300. Hasta que exista, Coolify no puede emitir el
+certificado y el despliegue queda a medias.
+
+**El DSN cargado en Coolify no es el de `.env.demo.local`.** El archivo usa
+`host=2.25.112.244`, que sirve desde tu máquina pero no desde adentro de un
+contenedor: la conexión a la IP pública del propio servidor no vuelve. En
+Coolify quedó con `host=1hrm4idgdx20aqz5grz12fqb`, el nombre interno del
+Postgres. Es el mismo error que dejó al bot de la agencia en bucle de
+reinicio la primera vez que se desplegó.
+
+`agente-ia` no se tocó: sigue en `main`, `running:healthy` y respondiendo.
 
 Si el piloto falla, desactivá su webhook y detené únicamente bot-demo.
 Conservá su base para diagnóstico. No borres ni reinicies recursos de la agencia.
