@@ -61,6 +61,7 @@ def crear_app(
         token=config.chatwoot_token,
         cuenta_id=config.chatwoot_cuenta_id,
         etiqueta_humano=config.chatwoot_etiqueta_humano,
+        bandeja_id=config.chatwoot_bandeja_id,
     )
 
     # El agente se arma una sola vez y atiende a todo el mundo. Es lo que
@@ -173,6 +174,9 @@ def crear_app(
             evento = await pedido.json()
         except Exception:
             return JSONResponse({"error": "esperaba JSON"}, status_code=400)
+
+        if not isinstance(evento, dict):
+            return JSONResponse({"error": "esperaba un objeto JSON"}, status_code=400)
 
         entrante = canal.traducir(evento)
 

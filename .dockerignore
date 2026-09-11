@@ -25,3 +25,5 @@ __pycache__/
 .gitignore
 tests/
 *.md
+# Las instrucciones de cada bot sí forman parte de la aplicación.
+!prompts/*.md

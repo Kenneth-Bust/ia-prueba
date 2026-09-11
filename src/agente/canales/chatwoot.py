@@ -68,6 +68,7 @@ class Chatwoot(Canal):
         token: str,
         cuenta_id: str | int,
         etiqueta_humano: str = "humano",
+        bandeja_id: str | int = "",
     ) -> None:
         if not url or not token:
             raise ValueError(
@@ -78,7 +79,10 @@ class Chatwoot(Canal):
         # La barra final sobra y duplicada rompe la URL ("...com//api/v1").
         self.url = url.rstrip("/")
         self.token = token
-        self.cuenta_id = str(cuenta_id)
+        self.cuenta_id = _identificador(cuenta_id)
+        self.bandeja_id = _identificador(bandeja_id) if str(bandeja_id).strip() else ""
+        if not self.cuenta_id or (str(bandeja_id).strip() and not self.bandeja_id):
+            raise ValueError("La cuenta y la bandeja de Chatwoot necesitan IDs positivos.")
         self.etiqueta_humano = (etiqueta_humano or "").strip().lower()
 
         # Los mensajes que ya contestamos. Chatwoot reintenta el webhook si no
@@ -98,12 +102,15 @@ class Chatwoot(Canal):
         atenderlo: en WhatsApp la gente manda la foto del producto sola,
         sin escribir nada. Antes se descartaba y el bot quedaba mudo.
         """
-        if evento.get("event") != "message_created":
+        if not self.pertenece(evento) or evento.get("event") != "message_created":
             return None
 
         conversacion = evento.get("conversation") or {}
         id_conversacion = conversacion.get("id")
-        texto = (evento.get("content") or "").strip()
+        contenido = evento.get("content") or ""
+        if not isinstance(contenido, str):
+            return None
+        texto = contenido.strip()
         adjuntos = _adjuntos_de(evento)
 
         if not id_conversacion or (not texto and not adjuntos):
@@ -154,6 +161,12 @@ class Chatwoot(Canal):
         """
         evento = mensaje.datos
 
+        # También lo comprobamos acá para los canales que reciben un
+        # MensajeEntrante ya armado, sin pasar por traducir(). Nunca hacemos
+        # consultas de etiquetas ni descargas para eventos de otra cuenta.
+        if not self.pertenece(evento):
+            return False
+
         # 1. Solo los mensajes que ENTRAN. Los que salen son las respuestas
         #    del propio agente y las de las personas del equipo. Sin este
         #    filtro el agente se lee a sí mismo y se contesta para siempre:
@@ -181,6 +194,36 @@ class Chatwoot(Canal):
         if mensaje.identificador:
             self._ya_contestados.append(mensaje.identificador)
 
+        return True
+
+    def pertenece(self, evento: dict) -> bool:
+        """Acepta únicamente eventos de esta cuenta y, si se fijó, bandeja."""
+        if not isinstance(evento, dict):
+            return False
+        cuenta = evento.get("account") or {}
+        conversacion = evento.get("conversation") or {}
+        bandeja = evento.get("inbox") or {}
+        if not all(isinstance(dato, dict) for dato in (cuenta, conversacion, bandeja)):
+            return False
+        if _identificador(cuenta.get("id")) != self.cuenta_id:
+            return False
+        if "account_id" in conversacion:
+            if _identificador(conversacion["account_id"]) != self.cuenta_id:
+                return False
+
+        if self.bandeja_id:
+            # Chatwoot puede ubicar el ID en inbox.id o conversation.inbox_id.
+            # Si aparecen varias ubicaciones, todas deben coincidir: elegir
+            # solamente una permitiría aceptar un evento contradictorio.
+            ids = [
+                dato[clave]
+                for dato, clave in (
+                    (bandeja, "id"), (conversacion, "inbox_id"), (evento, "inbox_id")
+                )
+                if clave in dato
+            ]
+            if not ids or any(_identificador(valor) != self.bandeja_id for valor in ids):
+                return False
         return True
 
     def _la_atiende_una_persona(self, evento: dict) -> bool:
@@ -292,6 +335,16 @@ class Chatwoot(Canal):
 
 
 # -- Ayudantes ----------------------------------------------------------------
+
+
+def _identificador(valor) -> str:
+    """Normaliza IDs de JSON sin confundir true con el número de cuenta 1."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int)):
+        return ""
+    texto = str(valor).strip()
+    if not texto.isascii() or not texto.isdecimal() or int(texto) <= 0:
+        return ""
+    return str(int(texto))
 
 
 def _adjuntos_de(evento: dict) -> list[Adjunto]:

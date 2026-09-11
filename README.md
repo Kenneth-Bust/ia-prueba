@@ -1,5 +1,9 @@
 # AgentKit
 
+Para preparar una segunda marca separada de tu agencia, seguí la
+[guía del piloto Cliente Demo](docs/piloto-demo.md). Incluye la configuración
+de Chatwoot, la memoria independiente y el despliegue en Coolify.
+
 Un agente de IA que corre **en tu computadora**. Sin servidor, sin hosting,
 sin pagar infraestructura. Funciona con **Claude, OpenAI o Gemini** —
 elegís cuál desde una lista, sin tocar código.

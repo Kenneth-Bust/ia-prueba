@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 # Raíz del proyecto (donde vive el .env)
 RAIZ = Path(__file__).resolve().parents[2]
@@ -71,6 +71,9 @@ class Config:
     # las escribiría una persona. En false salen todas juntas, que es más
     # rápido pero se nota que es un bot (ver respuesta.pausa_de_tipeo).
     ritmo_humano: bool = True
+    # Vacío conserva todas las bandejas de la cuenta actual. Cada bot de un
+    # cliente lleva un ID explícito para no atender otra bandeja por error.
+    chatwoot_bandeja_id: str = ""
 
     @classmethod
     def desde_entorno(
@@ -133,6 +136,7 @@ class Config:
             ).strip(),
             buffer_segundos=_entero("BUFFER_SEGUNDOS", 8),
             ritmo_humano=_booleano("RITMO_HUMANO", True),
+            chatwoot_bandeja_id=_identificador_opcional("CHATWOOT_BANDEJA_ID"),
         )
 
 
@@ -229,3 +233,38 @@ def _booleano(nombre: str, por_defecto: bool) -> bool:
     if not valor:
         return por_defecto
     return valor in ("1", "true", "si", "sí", "on", "yes")
+
+
+def _identificador_opcional(nombre: str) -> str:
+    valor = (os.getenv(nombre) or "").strip()
+    if valor and (not valor.isascii() or not valor.isdecimal() or int(valor) <= 0):
+        raise ErrorDeConfiguracion(f"{nombre} tiene que ser un ID positivo o quedar vacío.")
+    return str(int(valor)) if valor else ""
+
+
+@dataclass
+class AdministracionPiloto:
+    """Accesos de preparación; el webhook nunca carga estas credenciales."""
+
+    chatwoot_plataforma_token: str
+    coolify_url: str
+    coolify_token: str
+
+    @classmethod
+    def desde_archivo(cls) -> "AdministracionPiloto":
+        # El archivo está ignorado por Git y no entra en la imagen Docker.
+        # Separarlo evita darle permisos de infraestructura al bot que atiende.
+        valores = dotenv_values(RAIZ / ".env.admin.local")
+        return cls(
+            chatwoot_plataforma_token=(valores.get("CHATWOOT_PLATAFORMA_TOKEN") or "").strip(),
+            coolify_url=(valores.get("COOLIFY_URL") or "").strip().rstrip("/"),
+            coolify_token=(valores.get("COOLIFY_TOKEN") or "").strip(),
+        )
+
+
+def variables_demo() -> dict[str, str]:
+    """Lee exclusivamente el archivo del piloto, sin heredar claves de la agencia."""
+    return {
+        nombre: valor or ""
+        for nombre, valor in dotenv_values(RAIZ / ".env.demo.local").items()
+    }
