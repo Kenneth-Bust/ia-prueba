@@ -192,7 +192,7 @@ ver la respuesta en Chatwoot. La bandeja API no envía mensajes a WhatsApp.
 - [x] DNS y HTTPS del subdominio verificados.
 - [x] Respuesta real de Gemini en la bandeja demo.
 - [x] Reinicio de bot-demo con agencia disponible y memoria persistente.
-- [ ] Usuario de prueba sin acceso a la cuenta de la agencia.
+- [x] Usuario de prueba sin acceso a la cuenta de la agencia.
 
 ### Estado al 11 de septiembre de 2026
 
@@ -233,8 +233,34 @@ gestor de contraseñas y borrá el archivo.
 `piloto-demo` desde Super Admin. Es la credencial más poderosa de la
 instalación —puede crear y borrar cuentas— y el piloto ya no la necesita.
 
-**Pendiente de verificación manual:** entrar con `prueba.demo@` y confirmar
-que no puede alcanzar la cuenta 1, ni cambiando el ID en la URL.
+**Aislamiento de usuarios, verificado el 11 de septiembre.** Con la sesión de
+`prueba.demo@`, pedir `/app/accounts/1/dashboard` devuelve a la cuenta 2. Y
+contra la API, que es lo que importa porque no depende de la interfaz:
+
+```text
+cuenta 1 / conversations  →  401 "You are not authorized to access this account"
+cuenta 1 / inboxes        →  401
+cuenta 1 / contacts       →  401
+cuenta 1 / labels         →  401
+cuenta 2 / conversations  →  200
+```
+
+## Antes de montar un cliente que pague
+
+Lo que se probó acá alcanza para validar la separación, no para vender el
+servicio tal cual está. Falta:
+
+- **Subir `MAX_TOKENS`.** El piloto usa 512 para gastar poco, y eso corta las
+  respuestas a mitad de frase: se ve en la conversación de prueba. El bot de
+  la agencia usa 4096.
+- **El usuario técnico lo controla la agencia, no el cliente.** Su token es el
+  que usa el bot: si el cliente cambia su contraseña o borra ese usuario, su
+  bot deja de responder.
+- **Usar el email real del cliente** para su usuario. Los del piloto no son
+  buzones: nadie puede recuperar una contraseña ahí.
+- **Un secreto de webhook distinto por cliente**, como en este piloto.
+- **Backups del Postgres.** Hoy todas las memorias viven en un solo servidor
+  sin copia automática. Con clientes que pagan, eso deja de ser aceptable.
 
 Si el piloto falla, desactivá su webhook y detené únicamente bot-demo.
 Conservá su base para diagnóstico. No borres ni reinicies recursos de la agencia.
