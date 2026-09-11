@@ -39,3 +39,6 @@ datos/
 *.db
 *.sqlite3
 _vista-previa.html
+
+# Credenciales de los usuarios del piloto demo
+.credenciales-demo.local
