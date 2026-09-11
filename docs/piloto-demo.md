@@ -187,23 +187,36 @@ ver la respuesta en Chatwoot. La bandeja API no envía mensajes a WhatsApp.
 - [x] Rama `piloto-demo` publicada; `agente-ia` sigue apuntando a `main`.
 - [x] Aplicación `bot-demo` creada en Coolify, sin desplegar, con health check
       `/salud` y 15 de 18 variables cargadas.
-- [ ] Cuenta Cliente Demo y usuarios exclusivos creados en Chatwoot.
-- [ ] Bandeja API Pruebas Demo y webhook único configurados.
-- [ ] DNS y HTTPS del subdominio verificados.
+- [x] Cuenta Cliente Demo (ID 2) y usuarios exclusivos creados en Chatwoot.
+- [x] Bandeja API Pruebas Demo (ID 2) y webhook único configurados.
+- [x] DNS y HTTPS del subdominio verificados.
+- [x] Respuesta real de Gemini en la bandeja demo.
+- [x] Reinicio de bot-demo con agencia disponible y memoria persistente.
 - [ ] Usuario de prueba sin acceso a la cuenta de la agencia.
-- [ ] Respuesta real de Gemini en la bandeja demo.
-- [ ] Reinicio de bot-demo con agencia disponible y memoria persistente.
 
 ### Estado al 11 de septiembre de 2026
 
-Faltan tres variables en `bot-demo`, y las tres salen de crear la cuenta en
-Chatwoot: `CHATWOOT_CUENTA_ID`, `CHATWOOT_BANDEJA_ID` y `CHATWOOT_TOKEN`.
-Sin ellas el contenedor arranca y se queda sin atender ninguna bandeja.
+El piloto está funcionando. Lo que quedó montado:
 
-Falta también el registro DNS `bot-demo`. El conector de Hostinger quedó sin
-autorización, así que hay que crearlo desde hPanel: A, `bot-demo`,
-`2.25.112.244`, TTL 300. Hasta que exista, Coolify no puede emitir el
-certificado y el despliegue queda a medias.
+| Pieza | Valor |
+|---|---|
+| Cuenta de Chatwoot | `Cliente Demo`, ID **2** |
+| Bandeja API | `Pruebas Demo`, ID **2** |
+| Usuarios | `tecnico.demo@` (administrador), `prueba.demo@` (agente) |
+| Aplicación | `bot-demo`, rama `piloto-demo`, 18 variables |
+| Dominio | `https://bot-demo.automaticnic.online`, certificado válido |
+| Memoria | `memoria_demo`, usuario `bot_demo` |
+
+Comprobado en vivo, no solo con pruebas automáticas:
+
+- El bot responde como Cliente Demo, aclara que es demostración e informa
+  US$ 5. No menciona TecnoStore.
+- Un evento de la cuenta 1 enviado al webhook del demo se descarta
+  (`{"estado":"ignorado"}`), igual que uno de la cuenta 2 con otra bandeja.
+  El descarte ocurre antes de llamar a Gemini: un evento cruzado no gasta.
+- Tras reiniciar el contenedor, el bot recordó la consulta anterior. La
+  memoria sobrevive al reinicio.
+- `agente-ia` respondió `200` durante todo el despliegue y el reinicio.
 
 **El DSN cargado en Coolify no es el de `.env.demo.local`.** El archivo usa
 `host=2.25.112.244`, que sirve desde tu máquina pero no desde adentro de un
@@ -212,7 +225,16 @@ Coolify quedó con `host=1hrm4idgdx20aqz5grz12fqb`, el nombre interno del
 Postgres. Es el mismo error que dejó al bot de la agencia en bucle de
 reinicio la primera vez que se desplegó.
 
-`agente-ia` no se tocó: sigue en `main`, `running:healthy` y respondiendo.
+**Credenciales generadas.** Las contraseñas y los tokens de los dos usuarios
+demo quedaron en `.credenciales-demo.local`, que Git ignora. Pasalas a tu
+gestor de contraseñas y borrá el archivo.
+
+**Queda por hacer, cuando ya no haga falta:** borrar el Platform App
+`piloto-demo` desde Super Admin. Es la credencial más poderosa de la
+instalación —puede crear y borrar cuentas— y el piloto ya no la necesita.
+
+**Pendiente de verificación manual:** entrar con `prueba.demo@` y confirmar
+que no puede alcanzar la cuenta 1, ni cambiando el ID en la URL.
 
 Si el piloto falla, desactivá su webhook y detené únicamente bot-demo.
 Conservá su base para diagnóstico. No borres ni reinicies recursos de la agencia.
