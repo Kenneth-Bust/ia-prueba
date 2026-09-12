@@ -35,6 +35,31 @@ Lo mínimo antes de seguir leyendo:
 - La rama `piloto-demo` suma el filtro por cuenta y bandeja, y **todavía no
   está mergeada a `main`**.
 
+### Despliegue compartido por Codex y Claude
+
+El procedimiento está en [docs/despliegue.md](docs/despliegue.md). Desde la
+raíz del proyecto y con su entorno de Python:
+
+```bash
+python scripts/desplegar.py comprobar
+python scripts/desplegar.py desplegar
+```
+
+`comprobar` es de lectura. `desplegar` se usa cuando el usuario pidió el
+despliegue: exige `main` limpia y subida, verifica el destino, corre los
+tests, envía una sola solicitud y sigue el resultado. Conservá el ID y el
+commit que imprime para continuar con `estado` si la sesión se interrumpe.
+No repitas el despliegue por un timeout sin comprobar primero el historial.
+
+Las credenciales se leen desde `.env.coolify.local`, excluido de Git y de
+Docker, o del entorno. `COOLIFY_TOKEN` requiere Read y Deploy; si los permisos
+vienen separados, `COOLIFY_READ_TOKEN` lleva el de lectura. Si falta la
+credencial, pedí que se guarde en ese archivo, nunca en el chat. El comando
+no necesita reiniciar el editor ni claves de un proveedor de IA.
+
+El alcance de este comando es solo `agente-ia`; no despliega `bot-demo`, no
+borra memorias y no cambia etiquetas ni ajustes del servidor.
+
 El detalle del piloto multicliente está en [docs/piloto-demo.md](docs/piloto-demo.md).
 
 ---

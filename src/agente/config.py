@@ -6,10 +6,10 @@ Todo sale del archivo .env. Nada de credenciales escritas en el código.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 # Raíz del proyecto (donde vive el .env)
 RAIZ = Path(__file__).resolve().parents[2]
@@ -36,6 +36,30 @@ MODELOS_POR_DEFECTO = {
 
 class ErrorDeConfiguracion(Exception):
     """Falta algo en el .env o está mal puesto."""
+
+
+@dataclass(frozen=True)
+class ConfigDespliegue:
+    """Credenciales locales de operación; el bot no necesita cargarlas."""
+
+    token: str = field(repr=False)
+    token_lectura: str = field(default="", repr=False)
+
+    @classmethod
+    def desde_entorno(cls) -> "ConfigDespliegue":
+        # Se lee al ejecutar el comando, sin reiniciar Codex ni Claude.
+        # El archivo está excluido tanto de Git como de la imagen Docker.
+        valores = dotenv_values(RAIZ / ".env.coolify.local", interpolate=False)
+        token = (os.getenv("COOLIFY_TOKEN") or valores.get("COOLIFY_TOKEN") or "").strip()
+        lectura = (
+            os.getenv("COOLIFY_READ_TOKEN") or valores.get("COOLIFY_READ_TOKEN") or ""
+        ).strip()
+        if not token:
+            raise ErrorDeConfiguracion(
+                "Falta COOLIFY_TOKEN. Guardalo en .env.coolify.local; "
+                "no lo pegues en el chat ni en una línea de comandos."
+            )
+        return cls(token=token, token_lectura=lectura or token)
 
 
 @dataclass

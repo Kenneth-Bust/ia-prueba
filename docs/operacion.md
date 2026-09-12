@@ -190,6 +190,9 @@ conversaciones). El borrador de contrato está fuera del repositorio.
 
 ## Desplegar y comprobar el prompt de la promoción
 
+Para que Codex o Claude hagan el despliegue, usá el
+[comando compartido y su configuración local](despliegue.md).
+
 El prompt se relee en cada mensaje **dentro del contenedor**. Como el
 Dockerfile lo copia a la imagen, editar el archivo local y hacer push no
 actualiza por sí solo producción: hace falta un despliegue de Coolify.
