@@ -28,6 +28,7 @@ largo y por eso no va en el código.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -39,6 +40,7 @@ from ..agente import Agente
 from ..canales.buffer import BufferDeMensajes
 from ..canales.chatwoot import Chatwoot
 from ..config import Config
+from ..prompts import leer_prompt
 from ..respuesta import pausa_de_tipeo
 
 registro = logging.getLogger("agente.webhook")
@@ -153,11 +155,15 @@ def crear_app(
         Coolify le pega a esto cada tanto. Si no contesta, reinicia el
         contenedor.
         """
+        # Identifica el texto efectivo sin publicarlo. Se relee igual que
+        # en cada mensaje, para detectar un deploy con el prompt anterior.
+        prompt = leer_prompt(config.prompt_sistema)
         return {
             "estado": "ok",
             "proveedor": config.proveedor,
             "modelo": config.modelo,
             "memoria": "postgres" if config.modo == "produccion" else "sqlite",
+            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         }
 
     @app.post("/chatwoot/{token}")

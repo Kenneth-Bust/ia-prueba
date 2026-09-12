@@ -5,7 +5,7 @@ el código permite hacer. Si sos un agente de IA que abre este proyecto, leelo
 antes de tocar nada desplegado: te ahorra redescubrir todo y repetir errores
 que ya se pagaron.
 
-Última actualización: 11 de septiembre de 2026.
+Última actualización: 12 de septiembre de 2026.
 
 ---
 
@@ -17,7 +17,7 @@ administrado con **Coolify**. Al 11/09/2026: CPU 18 %, memoria 29 %, disco
 
 | Servicio | Dominio | Qué es |
 |---|---|---|
-| `agente-ia` | `agente.automaticnic.online` | Bot de la agencia (TecnoStore). Rama `main`. |
+| `agente-ia` | `agente.automaticnic.online` | Bot de la agencia (Smarth House). Rama `main`. |
 | `bot-demo` | `bot-demo.automaticnic.online` | Bot del piloto (Cliente Demo). Rama `piloto-demo`. |
 | `chatwoot` | `appchatwoot.automaticnic.online` | Una sola instalación, varias cuentas. |
 | Coolify | `appcoolify.automaticnic.online` | Panel. |
@@ -97,9 +97,13 @@ python scripts/olvidar.py --conversacion 3
 python scripts/olvidar.py --todas
 ```
 
-Borra lo que el bot recuerda; el historial de Chatwoot queda intacto. Va en
-el procedimiento de cualquier cambio grande de catálogo o de identidad:
-editar, desplegar, **olvidar**, probar.
+Borra lo que el bot recuerda; el historial de Chatwoot queda intacto. Ante
+un cambio grande de catálogo o identidad: editar, desplegar, comprobar las
+respuestas y, si hace falta, olvidar solo las conversaciones de prueba
+identificadas. **No ejecutar `--todas --si` como rutina de despliegue**: puede
+borrar el contexto de ventas en curso y de personas que están con un asesor.
+Antes de un borrado masivo, revisar el alcance y contar con una copia y con
+autorización explícita para esas conversaciones.
 
 No afecta a las campañas: cada persona nueva abre una conversación nueva, con
 memoria vacía. Solo arrastran las conversaciones que ya venían.
@@ -169,9 +173,55 @@ Definida y cargada en el prompt del bot de la agencia el 11/09/2026:
 Tres usuarios del panel (uno administrador y dos que atienden), pago por
 transferencia BAC, contrato de seis meses.
 
+La campaña tiene fecha límite publicada del **11 de octubre de 2026**. Para
+quienes contraten dentro de la promoción, **US$ 45 mensuales quedan fijos
+para siempre** en el plan de hasta 1.000 conversaciones: los seis meses son
+el compromiso mínimo, no la duración del precio. La primera explicación de
+costos debe incluir mensualidad, instalación y contrato.
+
+El prompt no garantiza tiempos de respuesta, ausencia total de errores ni
+un plazo de instalación sin que lo confirme el equipo. El calendario de
+pagos, el criterio exacto de conteo y las ampliaciones de capacidad también
+los confirma el equipo; el asistente no los inventa.
+
 El costo real por cliente es de unos US$ 12 al mes con cinco clientes
 (US$ 18 fijos de VPS y backups repartidos, más US$ 8,50 de IA por 500
 conversaciones). El borrador de contrato está fuera del repositorio.
+
+## Desplegar y comprobar el prompt de la promoción
+
+El prompt se relee en cada mensaje **dentro del contenedor**. Como el
+Dockerfile lo copia a la imagen, editar el archivo local y hacer push no
+actualiza por sí solo producción: hace falta un despliegue de Coolify.
+
+1. Probar los cambios y subir el commit a `main`.
+2. En Coolify, abrir **agente-ia**, comprobar repositorio y rama `main`, y
+   ejecutar **Deploy**. No seleccionar `bot-demo`.
+3. Esperar a que el despliegue termine correctamente. Comprobar el commit
+   efectivo en el registro; que el servicio anterior siga sano no demuestra
+   que se haya aplicado el cambio.
+4. Consultar `https://agente.automaticnic.online/salud`. Además de
+   `estado: ok`, las versiones nuevas devuelven `prompt_sha256`: la huella
+   SHA-256 del texto efectivo, leído en UTF-8 y sin espacios exteriores,
+   igual que lo recibe el modelo. Compararla con el prompt local revisado.
+   El endpoint no publica el contenido ni prueba la disponibilidad de Gemini.
+5. Probar desde WhatsApp el precio completo, el precio al séptimo mes y la
+   derivación a una persona. Antes de reactivar una conversación, revisar
+   su etiqueta actual y confirmar que nadie la esté atendiendo.
+
+Revisión del 12/09/2026: la conversación 3 ya no tenía la etiqueta `humano`;
+no hay que retirarla basándose en un resumen anterior. Los estados de las
+conversaciones se comprueban en vivo, no se asumen.
+
+Para desplegar por API se necesita un token de Coolify, distinto del token
+de Chatwoot. No guardar tokens en este documento ni pegarlos en un chat.
+Consultar la [documentación de despliegues de Coolify](https://coolify.io/docs/api/endpoints/deployments/deploy-by-tag-or-uuid)
+para el método y los permisos de la versión instalada.
+
+Al finalizar la campaña, revisar el prompt antes de seguir publicitando la
+oferta. El bot no dispone de una fecha actual confiable y no desactiva la
+promoción automáticamente; no cambiar la tarifa prometida a quienes ya
+contrataron dentro del plazo.
 
 ## Lo que falta antes de cobrarle a un cliente
 

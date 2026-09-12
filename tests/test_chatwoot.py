@@ -447,6 +447,37 @@ def test_el_salud_contesta():
     assert respuesta.json()["estado"] == "ok"
 
 
+def test_salud_identifica_el_prompt_efectivo_y_se_actualiza(tmp_path):
+    """Un servicio sano puede estar vendiendo con el prompt del deploy viejo."""
+    import hashlib
+
+    from agente.prompts import PROMPT_DE_EMERGENCIA
+    from test_agente import agente_falso
+
+    agente = agente_falso(["hola"])
+    agente.config.prompt_sistema = tmp_path / "sistema.md"
+    agente.config.prompt_sistema.write_text("  Primera oferta\n", encoding="utf-8")
+
+    with cliente(ChatwootFalso(), agente) as web:
+        inicial = web.get("/salud").json()
+        assert inicial["prompt_sha256"] == hashlib.sha256(
+            "Primera oferta".encode("utf-8")
+        ).hexdigest()
+        assert "Primera oferta" not in str(inicial)
+
+        agente.config.prompt_sistema.write_text("Oferta revisada", encoding="utf-8")
+        actualizado = web.get("/salud").json()
+        assert actualizado["prompt_sha256"] != inicial["prompt_sha256"]
+        assert actualizado["prompt_sha256"] == hashlib.sha256(
+            "Oferta revisada".encode("utf-8")
+        ).hexdigest()
+
+        agente.config.prompt_sistema.unlink()
+        assert web.get("/salud").json()["prompt_sha256"] == hashlib.sha256(
+            PROMPT_DE_EMERGENCIA.encode("utf-8")
+        ).hexdigest()
+
+
 # -- Fotos y audios -----------------------------------------------------------
 #
 # Lo que más llega por WhatsApp después del texto. Antes se descartaban en
