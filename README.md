@@ -739,6 +739,7 @@ Y estas, solo si vas a atender WhatsApp con `webhook_chatwoot.py`:
 | `CHATWOOT_WEBHOOK_TOKEN` | — | El secreto que va en la URL del webhook |
 | `CHATWOOT_ETIQUETA_HUMANO` | `humano` | La etiqueta que apaga al bot en una conversación |
 | `BUFFER_SEGUNDOS` | `8` | Cuánto espera juntando la ráfaga antes de contestar |
+| `RESPUESTA_MINIMA_SEGUNDOS` | `15` | Mínimo desde el último mensaje de la ráfaga hasta la primera respuesta; incluye buffer y modelo. `0` desactiva este mínimo |
 | `PUERTO` | `8000` | Dónde escucha el webhook |
 
 **No hace falta ninguna variable de Meta** (`WHATSAPP_TOKEN`, `APP_SECRET` y

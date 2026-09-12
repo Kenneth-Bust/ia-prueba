@@ -91,6 +91,9 @@ class Config:
     chatwoot_webhook_token: str = ""
     # Cuánto espera juntando la ráfaga antes de contestar (ver buffer.py).
     buffer_segundos: int = 8
+    # Tiempo mínimo hasta la primera respuesta, contado desde el último
+    # mensaje de la ráfaga. Incluye el buffer y lo que tardó el modelo.
+    respuesta_minima_segundos: int = 15
     # Si las respuestas partidas salen con pausa entre globo y globo, como
     # las escribiría una persona. En false salen todas juntas, que es más
     # rápido pero se nota que es un bot (ver respuesta.pausa_de_tipeo).
@@ -134,6 +137,12 @@ class Config:
                 f"MODO tiene que ser 'test' o 'produccion', no '{modo}'."
             )
 
+        respuesta_minima = _entero("RESPUESTA_MINIMA_SEGUNDOS", 15)
+        if respuesta_minima < 0:
+            raise ErrorDeConfiguracion(
+                "RESPUESTA_MINIMA_SEGUNDOS no puede ser negativo. Usá 0 para desactivar la espera."
+            )
+
         return cls(
             proveedor=proveedor,
             modelo=modelo,
@@ -156,6 +165,7 @@ class Config:
                 os.getenv("CHATWOOT_WEBHOOK_TOKEN") or ""
             ).strip(),
             buffer_segundos=_entero("BUFFER_SEGUNDOS", 8),
+            respuesta_minima_segundos=respuesta_minima,
             ritmo_humano=_booleano("RITMO_HUMANO", True),
         )
 

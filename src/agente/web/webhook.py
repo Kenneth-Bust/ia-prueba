@@ -32,6 +32,7 @@ import hashlib
 import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from time import monotonic
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -75,11 +76,16 @@ def crear_app(
     # respondieran en paralelo, los dos leerían la memoria en el mismo punto
     # y el segundo pisaría lo que guardó el primero.
     candados: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+    recibidos_en: dict[str, float] = {}
+    cerrando = False
 
     async def responder(
         conversacion: str, texto: str, adjuntos: list | None = None
     ) -> None:
         """Le pasa la ráfaga al agente y manda la respuesta por Chatwoot."""
+        # Se captura antes del candado: una ráfaga posterior tiene su propio
+        # reloj, aunque espere mientras terminamos de contestar esta.
+        recibido_en = recibidos_en.pop(conversacion, monotonic())
         async with candados[conversacion]:
             registro.info(
                 "[%s] %s%s",
@@ -116,6 +122,12 @@ def crear_app(
                 ]
 
             try:
+                if not cerrando:
+                    # No sumamos 15 segundos al tiempo del modelo: esperamos
+                    # únicamente lo que falta desde el último mensaje recibido.
+                    await _esperar_hasta(
+                        recibido_en + config.respuesta_minima_segundos
+                    )
                 await _enviar_con_ritmo(
                     canal, conversacion, mensajes, config.ritmo_humano
                 )
@@ -132,6 +144,7 @@ def crear_app(
 
     @asynccontextmanager
     async def ciclo_de_vida(app: FastAPI):
+        nonlocal cerrando
         registro.info(
             "Agente escuchando - %s / %s - memoria %s - buffer %ss",
             config.proveedor,
@@ -140,6 +153,9 @@ def crear_app(
             config.buffer_segundos,
         )
         yield
+        # Al desplegar no agregamos una demora artificial al vaciado: el
+        # servidor tiene un plazo limitado para cerrar sin perder mensajes.
+        cerrando = True
         # Al apagar, soltamos lo que estaba esperando. Sin esto, un deploy
         # justo en esos segundos se come la ráfaga de alguien.
         await buffer.vaciar()
@@ -164,6 +180,8 @@ def crear_app(
             "modelo": config.modelo,
             "memoria": "postgres" if config.modo == "produccion" else "sqlite",
             "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            "respuesta_minima_segundos": config.respuesta_minima_segundos,
+            "buffer_segundos": config.buffer_segundos,
         }
 
     @app.post("/chatwoot/{token}")
@@ -188,6 +206,7 @@ def crear_app(
             return JSONResponse({"estado": "ignorado"})
 
         # Se suma a la ráfaga y contestamos ya. Lo que sigue pasa solo.
+        recibidos_en[entrante.conversacion] = monotonic()
         await buffer.agregar(
             entrante.conversacion, entrante.texto, entrante.adjuntos
         )
@@ -195,6 +214,14 @@ def crear_app(
         return JSONResponse({"estado": "recibido"})
 
     return app
+
+
+async def _esperar_hasta(instante: float) -> None:
+    """Espera sin bloquear otros chats; si el modelo tardó más, no demora."""
+    # Revalidar evita enviar antes del mínimo si el reloj del sistema o el
+    # temporizador de asyncio despiertan con una pequeña diferencia.
+    while (restante := instante - monotonic()) > 0:
+        await asyncio.sleep(restante)
 
 
 async def _enviar_con_ritmo(

@@ -173,11 +173,22 @@ Definida y cargada en el prompt del bot de la agencia el 11/09/2026:
 Tres usuarios del panel (uno administrador y dos que atienden), pago por
 transferencia BAC, contrato de seis meses.
 
+La tarifa incluye el panel CRM propio del negocio para monitorear las
+conversaciones, soporte y capacitación. "Propio" es su espacio y sus accesos,
+no propiedad del software ni servidor exclusivo. No se promete soporte
+humano 24/7 ni una cantidad de sesiones u horas sin confirmación del equipo.
+
 La campaña tiene fecha límite publicada del **11 de octubre de 2026**. Para
 quienes contraten dentro de la promoción, **US$ 45 mensuales quedan fijos
 para siempre** en el plan de hasta 1.000 conversaciones: los seis meses son
 el compromiso mínimo, no la duración del precio. La primera explicación de
 costos debe incluir mensualidad, instalación y contrato.
+También debe indicar expresamente que es una promoción por tiempo limitado,
+la fecha límite y el CRM, soporte y capacitación incluidos. Cada mención
+de tarifa fija o para siempre debe llevar el límite de hasta 1.000
+conversaciones por mes; los excesos se consultan, no generan cobros ni una
+pérdida permanente de la promoción inventados por el bot. El total inicial
+de US$ 195 (150 + 45) fue confirmado por el dueño.
 
 El prompt no garantiza tiempos de respuesta, ausencia total de errores ni
 un plazo de instalación sin que lo confirme el equipo. El calendario de
@@ -187,6 +198,20 @@ los confirma el equipo; el asistente no los inventa.
 El costo real por cliente es de unos US$ 12 al mes con cinco clientes
 (US$ 18 fijos de VPS y backups repartidos, más US$ 8,50 de IA por 500
 conversaciones). El borrador de contrato está fuera del repositorio.
+
+## Tiempo de respuesta en WhatsApp
+
+`RESPUESTA_MINIMA_SEGUNDOS` vale **15** por defecto. Se mide desde la recepción
+del último mensaje de la ráfaga hasta el primer envío, contando el buffer y
+la generación de la IA. Si esos pasos ya tardaron más, no agrega otra pausa.
+No es una garantía de entrega exacta a los 15 segundos: el proveedor, la red
+y las ráfagas pueden alargarla. No afecta Telegram ni la consola.
+
+El webhook sigue confirmando recepción sin esperar esa pausa cuando el
+buffer está habilitado. Cada chat mantiene su reloj; no bloquea otras
+conversaciones. Al apagar se omite la demora artificial para vaciar pendientes.
+`0` desactiva solo el mínimo; no desactiva `BUFFER_SEGUNDOS`. `/salud` publica
+ambos valores para verificar la configuración efectiva tras el despliegue.
 
 ## Desplegar y comprobar el prompt de la promoción
 
