@@ -5,7 +5,7 @@ el código permite hacer. Si sos un agente de IA que abre este proyecto, leelo
 antes de tocar nada desplegado: te ahorra redescubrir todo y repetir errores
 que ya se pagaron.
 
-Última actualización: 12 de septiembre de 2026.
+Última actualización: 13 de septiembre de 2026.
 
 ---
 
@@ -163,32 +163,62 @@ Cosas que parecen bugs, no lo son, y cuestan horas de encontrar:
 
 ## La oferta comercial
 
-Definida y cargada en el prompt del bot de la agencia el 11/09/2026:
+Enfoque comercial revisado el 13/09/2026 en el prompt de la agencia. Su
+aplicación en producción se verifica mediante el despliegue y la huella del
+prompt en `/salud`; la fecha de este documento no acredita un despliegue.
 
 | Concepto | Monto |
 |---|---|
-| Instalación, una vez | US$ 150 |
 | Mensualidad, hasta 1.000 conversaciones | US$ 45 |
+| Instalación | Propuesta que el dueño define con el prospecto en la demo |
 
 Tres usuarios del panel (uno administrador y dos que atienden), pago por
-transferencia BAC, contrato de seis meses.
+transferencia BAC. El contrato de seis meses es el antecedente comercial
+interno: este cambio no cancela contratos ni modifica acuerdos existentes.
+Las condiciones de contratación las explica y confirma personalmente el
+equipo; el bot no publica plazos de permanencia.
 
 La tarifa incluye el panel CRM propio del negocio para monitorear las
-conversaciones, soporte y capacitación. "Propio" es su espacio y sus accesos,
-no propiedad del software ni servidor exclusivo. No se promete soporte
+conversaciones, una app para revisar los chats y responder desde el celular,
+soporte y capacitación. "Propio" es su espacio y sus accesos, no propiedad del
+software, una app exclusiva ni servidor exclusivo. No se promete soporte
 humano 24/7 ni una cantidad de sesiones u horas sin confirmación del equipo.
+La app permite llevar la atención desde el celular; el envío de
+notificaciones al teléfono sigue pendiente, como se explica en el traspaso.
 
 La campaña tiene fecha límite publicada del **11 de octubre de 2026**. Para
 quienes contraten dentro de la promoción, **US$ 45 mensuales quedan fijos
-para siempre** en el plan de hasta 1.000 conversaciones: los seis meses son
-el compromiso mínimo, no la duración del precio. La primera explicación de
-costos debe incluir mensualidad, instalación y contrato.
-También debe indicar expresamente que es una promoción por tiempo limitado,
-la fecha límite y el CRM, soporte y capacitación incluidos. Cada mención
-de tarifa fija o para siempre debe llevar el límite de hasta 1.000
-conversaciones por mes; los excesos se consultan, no generan cobros ni una
-pérdida permanente de la promoción inventados por el bot. El total inicial
-de US$ 195 (150 + 45) fue confirmado por el dueño.
+para siempre** en el plan de hasta 1.000 conversaciones. La primera
+explicación de precio confirma la mensualidad, la promoción por tiempo
+limitado, la fecha límite y el CRM, app para el celular, soporte y
+capacitación incluidos. Cierra con una invitación a coordinar una demo por
+videollamada, sin preguntar además el rubro o el volumen de mensajes. Si ya
+la ofreció, no insiste. Cada mención de tarifa fija o para siempre debe
+llevar el límite de hasta 1.000 conversaciones por mes; los excesos se
+consultan, no generan cobros ni una pérdida permanente de la promoción
+inventados por el bot.
+
+**La presentación inicial ya no incluye instalación ni contrato.** Los
+US$ 150 de instalación y el total inicial de US$ 195 son referencias del
+enfoque anterior, no cotizaciones autorizadas para el bot. El dueño quiere
+mostrar primero la demo y negociar personalmente la instalación. Si
+preguntan por el costo inicial, la instalación o la permanencia, el bot
+explica que la propuesta y las condiciones las confirma el equipo en la
+videollamada. No inventa importes o descuentos, no promete instalación
+gratis o incluida ni ausencia de contrato. Si el prospecto prefiere
+resolverlo por chat, puede pasar a un asesor sin exigir una llamada.
+
+**Aceptar la demo activa el traspaso existente**, con la frase literal
+"Perfecto, te paso con una persona del equipo y te escribe por aquí mismo."
+También aplica si la persona pide directamente una demo. No se agrega una
+segunda confirmación. El equipo coordina la videollamada: no hay integración
+de agenda y el bot no confirma reservas, horarios ni enlaces. La
+automatización y la frase que la activa conservan su funcionamiento.
+
+El prompt indica que las cotizaciones y los plazos de respuestas anteriores
+deben confirmarse con el equipo, sin repetirlos como vigentes ni invalidar
+acuerdos por su cuenta. Se conserva la memoria de los prospectos; no se
+borra como parte de este cambio comercial.
 
 El prompt no garantiza tiempos de respuesta, ausencia total de errores ni
 un plazo de instalación sin que lo confirme el equipo. El calendario de
@@ -233,9 +263,14 @@ actualiza por sí solo producción: hace falta un despliegue de Coolify.
    SHA-256 del texto efectivo, leído en UTF-8 y sin espacios exteriores,
    igual que lo recibe el modelo. Compararla con el prompt local revisado.
    El endpoint no publica el contenido ni prueba la disponibilidad de Gemini.
-5. Probar desde WhatsApp el precio completo, el precio al séptimo mes y la
-   derivación a una persona. Antes de reactivar una conversación, revisar
-   su etiqueta actual y confirmar que nadie la esté atendiendo.
+5. Probar con una conversación de prueba identificada: la mensualidad y sus
+   beneficios (incluida la app), la tarifa en un mes posterior, las preguntas
+   directas de instalación o contrato y la aceptación de la demo con traspaso
+   literal. Verificar también que no insiste si se rechaza la demo ni retoma
+   cotizaciones antiguas como vigentes. Los tests con modelos falsos no
+   validan la redacción que genera el proveedor real. Antes de reactivar una
+   conversación, revisar su etiqueta actual y confirmar que nadie la esté
+   atendiendo.
 
 Revisión del 12/09/2026: la conversación 3 ya no tenía la etiqueta `humano`;
 no hay que retirarla basándose en un resumen anterior. Los estados de las
