@@ -163,9 +163,9 @@ Cosas que parecen bugs, no lo son, y cuestan horas de encontrar:
 
 ## La oferta comercial
 
-Enfoque comercial revisado el 13/09/2026 en el prompt de la agencia. Su
-aplicación en producción se verifica mediante el despliegue y la huella del
-prompt en `/salud`; la fecha de este documento no acredita un despliegue.
+Enfoque comercial revisado y desplegado el 13/09/2026 en el bot de la agencia.
+La revisión, el ID de despliegue y la huella comprobada en `/salud` constan
+en el [registro de despliegues verificados](#registro-de-despliegues-verificados).
 
 | Concepto | Monto |
 |---|---|
@@ -285,6 +285,50 @@ Al finalizar la campaña, revisar el prompt antes de seguir publicitando la
 oferta. El bot no dispone de una fecha actual confiable y no desactiva la
 promoción automáticamente; no cambiar la tarifa prometida a quienes ya
 contrataron dentro del plazo.
+
+## Registro de despliegues verificados
+
+### 13/09/2026 — Demo por videollamada y app para el celular
+
+Se publicó el cambio en `main` y se desplegó únicamente `agente-ia` con
+`scripts/desplegar.py`. La campaña de Meta seguía activa durante el cambio.
+
+| Evidencia | Valor verificado |
+|---|---|
+| Commit de la versión desplegada | `ef42fbbab75371726586a3e4e776d59010fe88b4` |
+| ID del despliegue en Coolify | `wzr74l1rzexhwcjw8tpwtrha` |
+| Estado del despliegue | `finished` |
+| Estado de la aplicación al finalizar | `running:healthy` |
+| Salud pública | `estado: ok` |
+| SHA-256 del prompt efectivo | `3065e9761ddad910bae5d2595f37c0ca760a941e0f228b6da6450e8c999709b5` |
+| Pruebas automáticas | 164 aprobadas, con modelos falsos, sin consumir tokens |
+
+El prompt efectivo coincidió con el del commit publicado. Mantiene la
+mensualidad y la promoción, suma la app del celular y busca coordinar una
+demo; retira la cotización fija de instalación y la mención automática de
+permanencia. La [oferta comercial](#la-oferta-comercial) describe cómo
+responder consultas directas y hacer el traspaso.
+
+No se modificaron la rama ni el servicio del piloto, las variables de
+producción o las automatizaciones de Chatwoot. No se borraron memorias ni
+se cambiaron etiquetas. `/salud` del piloto también devolvió `ok`.
+
+**Alcance de la verificación:** se comprobó el despliegue y la identidad del
+prompt cargado. No se envió una conversación real de prueba por WhatsApp;
+la validación de las respuestas del proveedor y del recorrido de aceptación
+de la demo queda pendiente. No la des por hecha a partir de los tests ni de
+la salud del servicio.
+
+**Despliegue automático:** Coolify mostraba `is_auto_deploy_enabled=true`,
+pero el historial no registró un despliegue nuevo después del push. Se
+comprobó que no hubiera uno nuevo o pendiente antes de iniciar una única
+solicitud manual con el comando compartido. En próximos cambios, consultá
+el historial después del push antes de crear otro despliegue; no asumas que
+el indicador por sí solo demuestra que GitHub lo haya iniciado.
+
+Este registro describe lo verificado en esa fecha. Los commits posteriores
+que solo actualizan documentación no implican otro despliegue: antes de
+operar, comprobá el estado real en Coolify y la huella del prompt.
 
 ## Lo que falta antes de cobrarle a un cliente
 

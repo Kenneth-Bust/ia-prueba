@@ -26,12 +26,20 @@ Lo mínimo antes de seguir leyendo:
   prospectos de la agencia: no despliegues sin probar.
 - **`prompts/sistema.md` es la vidriera del negocio**, no un ejemplo. Vende
   el servicio de la agencia con precios reales.
+- **El objetivo comercial es coordinar una demo por videollamada.** La
+  presentación incluye mensualidad, CRM y app para el celular; instalación
+  y contratación las conversa el asesor. No vuelvas a introducir la
+  cotización fija de instalación ni la permanencia en la respuesta inicial.
+  La política completa está en [la oferta comercial](docs/operacion.md#la-oferta-comercial)
+  y su despliegue en el [registro de producción](docs/operacion.md#registro-de-despliegues-verificados).
 - **Un contenedor no alcanza la IP pública del propio servidor**: los DSN de
   Postgres van con el host interno de Docker. Este error dejó a los dos bots
   en bucle de reinicio.
-- **Cambiar el prompt no alcanza**: las conversaciones abiertas arrastran la
-  identidad anterior. Después de un cambio grande va
-  `python scripts/olvidar.py`.
+- **Las conversaciones abiertas pueden arrastrar respuestas anteriores.**
+  Primero verificá el prompt desplegado y el comportamiento. No borres
+  memorias como rutina: el cambio comercial conserva el contexto de los
+  prospectos. Cualquier limpieza se limita a pruebas identificadas; para
+  borrados masivos rigen las condiciones de [operación](docs/operacion.md#la-memoria-arrastra-la-identidad-anterior).
 - La rama `piloto-demo` suma el filtro por cuenta y bandeja, y **todavía no
   está mergeada a `main`**.
 

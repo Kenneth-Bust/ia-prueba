@@ -62,10 +62,21 @@ conexión, revisá el historial antes de repetir: Coolify pudo haberla recibido.
 La compatibilidad con el método GET de versiones anteriores solo se intenta
 cuando POST devuelve específicamente HTTP 405.
 
+**Después de hacer push, revisá el historial antes de ejecutar `desplegar`.**
+Si Coolify ya inició un despliegue para ese commit, seguí su ID con `estado`
+en vez de crear otro. El comando `desplegar` no detecta por sí solo esa
+posible ejecución automática. El indicador de despliegue automático puede
+estar habilitado sin que el push haya iniciado nada; verificá el historial.
+
 El comando está limitado a `agente-ia`, rama `main`, del repositorio
 `Kenneth-Bust/ia-prueba`. No modifica el piloto, la memoria, las etiquetas de
 Chatwoot ni las variables de producción. La comprobación de salud no
 sustituye una prueba funcional desde WhatsApp ni confirma el saldo de Gemini.
+
+Al finalizar, dejá el commit desplegado, el ID, la huella del prompt y el
+alcance de las comprobaciones en el [registro de producción](operacion.md#registro-de-despliegues-verificados).
+Separá lo comprobado de las pruebas pendientes. Documentar el resultado no
+requiere volver a desplegar el servicio.
 
 ## Referencias
 
