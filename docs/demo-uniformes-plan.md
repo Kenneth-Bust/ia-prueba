@@ -64,12 +64,12 @@ implementación, verificar y desactivar el automático solamente de
 ajuste de `agente-ia`. El plan se guarda inicialmente con commit local,
 sin push, para no disparar un despliegue mientras solo se documenta.
 
-`piloto-demo` tiene los filtros de cuenta/bandeja, pero le faltan cambios
-posteriores de `main`, incluida la huella del prompt en `/salud` y el comando
-compartido de despliegue. `main` no tiene todavía los filtros del piloto.
-La primera tarea de implementación es integrar `origin/main` **hacia
-`piloto-demo`**, resolviendo los conflictos y conservando los filtros y
-archivos del piloto. Nunca hacer la integración en la dirección inversa.
+El 14/09/2026 se integró localmente `origin/main` en `piloto-demo`, desde la
+revisión `44bc631a3b33c406fab5f3fe0c34476c2febb90a`. Se conservaron los filtros,
+archivos y documentación del piloto, además de la huella del prompt, la espera
+mínima y las herramientas de operación agregadas en `main`. La suite combinada
+aprobó 203 pruebas con modelos falsos. Esta integración no modifica `main` ni
+significa que los filtros del piloto hayan llegado a producción.
 
 ## 3. Demo que vamos a mostrar
 
@@ -309,7 +309,8 @@ registrarlo y continuar las partes locales que no dependan de él.
 - [x] Pedido y alcance de permisos confirmados con el usuario.
 - [x] Ramas y recursos existentes revisados en lectura.
 - [x] Plan y guion ficticio escritos para continuidad.
-- [ ] Integración de `main` hacia `piloto-demo` y suite de referencia.
+- [x] Integración de `main` hacia `piloto-demo`; 203 pruebas de referencia
+  aprobadas localmente, sin llamadas a Gemini.
 - [ ] Catálogo, imágenes y cotizador implementados.
 - [ ] Envío de adjuntos y cotizaciones persistentes implementados.
 - [ ] Dos bandejas y simulador disponibles.

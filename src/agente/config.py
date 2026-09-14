@@ -6,7 +6,7 @@ Todo sale del archivo .env. Nada de credenciales escritas en el código.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
@@ -38,6 +38,30 @@ class ErrorDeConfiguracion(Exception):
     """Falta algo en el .env o está mal puesto."""
 
 
+@dataclass(frozen=True)
+class ConfigDespliegue:
+    """Credenciales locales de operación; el bot no necesita cargarlas."""
+
+    token: str = field(repr=False)
+    token_lectura: str = field(default="", repr=False)
+
+    @classmethod
+    def desde_entorno(cls) -> "ConfigDespliegue":
+        # Se lee al ejecutar el comando, sin reiniciar Codex ni Claude.
+        # El archivo está excluido tanto de Git como de la imagen Docker.
+        valores = dotenv_values(RAIZ / ".env.coolify.local", interpolate=False)
+        token = (os.getenv("COOLIFY_TOKEN") or valores.get("COOLIFY_TOKEN") or "").strip()
+        lectura = (
+            os.getenv("COOLIFY_READ_TOKEN") or valores.get("COOLIFY_READ_TOKEN") or ""
+        ).strip()
+        if not token:
+            raise ErrorDeConfiguracion(
+                "Falta COOLIFY_TOKEN. Guardalo en .env.coolify.local; "
+                "no lo pegues en el chat ni en una línea de comandos."
+            )
+        return cls(token=token, token_lectura=lectura or token)
+
+
 @dataclass
 class Config:
     proveedor: str
@@ -67,6 +91,9 @@ class Config:
     chatwoot_webhook_token: str = ""
     # Cuánto espera juntando la ráfaga antes de contestar (ver buffer.py).
     buffer_segundos: int = 8
+    # Tiempo mínimo hasta la primera respuesta, contado desde el último
+    # mensaje de la ráfaga. Incluye el buffer y lo que tardó el modelo.
+    respuesta_minima_segundos: int = 15
     # Si las respuestas partidas salen con pausa entre globo y globo, como
     # las escribiría una persona. En false salen todas juntas, que es más
     # rápido pero se nota que es un bot (ver respuesta.pausa_de_tipeo).
@@ -113,6 +140,12 @@ class Config:
                 f"MODO tiene que ser 'test' o 'produccion', no '{modo}'."
             )
 
+        respuesta_minima = _entero("RESPUESTA_MINIMA_SEGUNDOS", 15)
+        if respuesta_minima < 0:
+            raise ErrorDeConfiguracion(
+                "RESPUESTA_MINIMA_SEGUNDOS no puede ser negativo. Usá 0 para desactivar la espera."
+            )
+
         return cls(
             proveedor=proveedor,
             modelo=modelo,
@@ -135,6 +168,7 @@ class Config:
                 os.getenv("CHATWOOT_WEBHOOK_TOKEN") or ""
             ).strip(),
             buffer_segundos=_entero("BUFFER_SEGUNDOS", 8),
+            respuesta_minima_segundos=respuesta_minima,
             ritmo_humano=_booleano("RITMO_HUMANO", True),
             chatwoot_bandeja_id=_identificador_opcional("CHATWOOT_BANDEJA_ID"),
         )

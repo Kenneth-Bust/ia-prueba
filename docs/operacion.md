@@ -5,7 +5,7 @@ el código permite hacer. Si sos un agente de IA que abre este proyecto, leelo
 antes de tocar nada desplegado: te ahorra redescubrir todo y repetir errores
 que ya se pagaron.
 
-Última actualización: 11 de septiembre de 2026.
+Última actualización: 13 de septiembre de 2026.
 
 ---
 
@@ -17,7 +17,7 @@ administrado con **Coolify**. Al 11/09/2026: CPU 18 %, memoria 29 %, disco
 
 | Servicio | Dominio | Qué es |
 |---|---|---|
-| `agente-ia` | `agente.automaticnic.online` | Bot de la agencia (TecnoStore). Rama `main`. |
+| `agente-ia` | `agente.automaticnic.online` | Bot de la agencia (Smarth House). Rama `main`. |
 | `bot-demo` | `bot-demo.automaticnic.online` | Bot del piloto (Cliente Demo). Rama `piloto-demo`. |
 | `chatwoot` | `appchatwoot.automaticnic.online` | Una sola instalación, varias cuentas. |
 | Coolify | `appcoolify.automaticnic.online` | Panel. |
@@ -55,6 +55,58 @@ llamar al modelo: un evento cruzado no gasta tokens. Verificado en vivo.
 
 `agente-ia` corre `main`, que todavía **no** tiene ese filtro; su protección
 es el secreto del webhook. Cuando se mergee `piloto-demo` lo va a tener.
+
+## El traspaso a una persona, de punta a punta
+
+Funciona sin que nadie toque nada, y conviene entender la cadena porque
+depende de una frase literal:
+
+```text
+el prospecto pide un asesor
+  → el asistente responde, tal cual:
+    "te paso con una persona del equipo y te escribe por aquí mismo"
+  → la automatización "Traspaso a una persona" de Chatwoot detecta la frase
+  → le pone la etiqueta `humano`  →  el bot se calla en ese chat
+  → asigna la conversación al usuario 1
+```
+
+**Si se cambia esa frase en `prompts/sistema.md`, hay que cambiar también la
+condición de la automatización**, o el traspaso deja de marcarse y nadie se
+entera. Están acopladas a propósito: es lo que evita programar una
+herramienta para que el bot etiquete.
+
+Probado en vivo el 11/09/2026 en la conversación 3.
+
+**Lo que todavía no llega es el aviso al teléfono.** Chatwoot genera la
+notificación interna (se ve en la campanita y en la app), pero el servidor no
+tiene configurado el envío de push: no hay variables de VAPID ni de Firebase.
+Hasta resolverlo, los traspasos se miran entrando a la app, en «Míos» o
+filtrando por la etiqueta `humano`.
+
+## La memoria arrastra la identidad anterior
+
+Al cambiar el prompt del bot de la agencia de TecnoStore a Smarth House, el
+primer mensaje siguió contestando como la tienda de PCs. **No era el
+despliegue**: el contenedor ya tenía el prompt nuevo.
+
+El bot lee su prompt más los últimos veinte mensajes de la charla, y veinte
+mensajes hablando de placas de video pesan más que unas instrucciones nuevas.
+
+```bash
+python scripts/olvidar.py --conversacion 3
+python scripts/olvidar.py --todas
+```
+
+Borra lo que el bot recuerda; el historial de Chatwoot queda intacto. Ante
+un cambio grande de catálogo o identidad: editar, desplegar, comprobar las
+respuestas y, si hace falta, olvidar solo las conversaciones de prueba
+identificadas. **No ejecutar `--todas --si` como rutina de despliegue**: puede
+borrar el contexto de ventas en curso y de personas que están con un asesor.
+Antes de un borrado masivo, revisar el alcance y contar con una copia y con
+autorización explícita para esas conversaciones.
+
+No afecta a las campañas: cada persona nueva abre una conversación nueva, con
+memoria vacía. Solo arrastran las conversaciones que ya venían.
 
 ## Los tres niveles de acceso
 
@@ -108,6 +160,175 @@ Cosas que parecen bugs, no lo son, y cuestan horas de encontrar:
 - **El nivel gratuito de Gemini falla 3 de cada 4 llamadas** con 503 "high
   demand". Con créditos cargados el problema desaparece. El código reintenta
   tres veces con espera creciente.
+
+## La oferta comercial
+
+Enfoque comercial revisado y desplegado el 13/09/2026 en el bot de la agencia.
+La revisión, el ID de despliegue y la huella comprobada en `/salud` constan
+en el [registro de despliegues verificados](#registro-de-despliegues-verificados).
+
+| Concepto | Monto |
+|---|---|
+| Mensualidad, hasta 1.000 conversaciones | US$ 45 |
+| Instalación | Propuesta que el dueño define con el prospecto en la demo |
+
+Tres usuarios del panel (uno administrador y dos que atienden), pago por
+transferencia BAC. El contrato de seis meses es el antecedente comercial
+interno: este cambio no cancela contratos ni modifica acuerdos existentes.
+Las condiciones de contratación las explica y confirma personalmente el
+equipo; el bot no publica plazos de permanencia.
+
+La tarifa incluye el panel CRM propio del negocio para monitorear las
+conversaciones, una app para revisar los chats y responder desde el celular,
+soporte y capacitación. "Propio" es su espacio y sus accesos, no propiedad del
+software, una app exclusiva ni servidor exclusivo. No se promete soporte
+humano 24/7 ni una cantidad de sesiones u horas sin confirmación del equipo.
+La app permite llevar la atención desde el celular; el envío de
+notificaciones al teléfono sigue pendiente, como se explica en el traspaso.
+
+La campaña tiene fecha límite publicada del **11 de octubre de 2026**. Para
+quienes contraten dentro de la promoción, **US$ 45 mensuales quedan fijos
+para siempre** en el plan de hasta 1.000 conversaciones. La primera
+explicación de precio confirma la mensualidad, la promoción por tiempo
+limitado, la fecha límite y el CRM, app para el celular, soporte y
+capacitación incluidos. Cierra con una invitación a coordinar una demo por
+videollamada, sin preguntar además el rubro o el volumen de mensajes. Si ya
+la ofreció, no insiste. Cada mención de tarifa fija o para siempre debe
+llevar el límite de hasta 1.000 conversaciones por mes; los excesos se
+consultan, no generan cobros ni una pérdida permanente de la promoción
+inventados por el bot.
+
+**La presentación inicial ya no incluye instalación ni contrato.** Los
+US$ 150 de instalación y el total inicial de US$ 195 son referencias del
+enfoque anterior, no cotizaciones autorizadas para el bot. El dueño quiere
+mostrar primero la demo y negociar personalmente la instalación. Si
+preguntan por el costo inicial, la instalación o la permanencia, el bot
+explica que la propuesta y las condiciones las confirma el equipo en la
+videollamada. No inventa importes o descuentos, no promete instalación
+gratis o incluida ni ausencia de contrato. Si el prospecto prefiere
+resolverlo por chat, puede pasar a un asesor sin exigir una llamada.
+
+**Aceptar la demo activa el traspaso existente**, con la frase literal
+"Perfecto, te paso con una persona del equipo y te escribe por aquí mismo."
+También aplica si la persona pide directamente una demo. No se agrega una
+segunda confirmación. El equipo coordina la videollamada: no hay integración
+de agenda y el bot no confirma reservas, horarios ni enlaces. La
+automatización y la frase que la activa conservan su funcionamiento.
+
+El prompt indica que las cotizaciones y los plazos de respuestas anteriores
+deben confirmarse con el equipo, sin repetirlos como vigentes ni invalidar
+acuerdos por su cuenta. Se conserva la memoria de los prospectos; no se
+borra como parte de este cambio comercial.
+
+El prompt no garantiza tiempos de respuesta, ausencia total de errores ni
+un plazo de instalación sin que lo confirme el equipo. El calendario de
+pagos, el criterio exacto de conteo y las ampliaciones de capacidad también
+los confirma el equipo; el asistente no los inventa.
+
+El costo real por cliente es de unos US$ 12 al mes con cinco clientes
+(US$ 18 fijos de VPS y backups repartidos, más US$ 8,50 de IA por 500
+conversaciones). El borrador de contrato está fuera del repositorio.
+
+## Tiempo de respuesta en WhatsApp
+
+`RESPUESTA_MINIMA_SEGUNDOS` vale **15** por defecto. Se mide desde la recepción
+del último mensaje de la ráfaga hasta el primer envío, contando el buffer y
+la generación de la IA. Si esos pasos ya tardaron más, no agrega otra pausa.
+No es una garantía de entrega exacta a los 15 segundos: el proveedor, la red
+y las ráfagas pueden alargarla. No afecta Telegram ni la consola.
+
+El webhook sigue confirmando recepción sin esperar esa pausa cuando el
+buffer está habilitado. Cada chat mantiene su reloj; no bloquea otras
+conversaciones. Al apagar se omite la demora artificial para vaciar pendientes.
+`0` desactiva solo el mínimo; no desactiva `BUFFER_SEGUNDOS`. `/salud` publica
+ambos valores para verificar la configuración efectiva tras el despliegue.
+
+## Desplegar y comprobar el prompt de la promoción
+
+Para que Codex o Claude hagan el despliegue, usá el
+[comando compartido y su configuración local](despliegue.md).
+
+El prompt se relee en cada mensaje **dentro del contenedor**. Como el
+Dockerfile lo copia a la imagen, editar el archivo local y hacer push no
+actualiza por sí solo producción: hace falta un despliegue de Coolify.
+
+1. Probar los cambios y subir el commit a `main`.
+2. En Coolify, abrir **agente-ia**, comprobar repositorio y rama `main`, y
+   ejecutar **Deploy**. No seleccionar `bot-demo`.
+3. Esperar a que el despliegue termine correctamente. Comprobar el commit
+   efectivo en el registro; que el servicio anterior siga sano no demuestra
+   que se haya aplicado el cambio.
+4. Consultar `https://agente.automaticnic.online/salud`. Además de
+   `estado: ok`, las versiones nuevas devuelven `prompt_sha256`: la huella
+   SHA-256 del texto efectivo, leído en UTF-8 y sin espacios exteriores,
+   igual que lo recibe el modelo. Compararla con el prompt local revisado.
+   El endpoint no publica el contenido ni prueba la disponibilidad de Gemini.
+5. Probar con una conversación de prueba identificada: la mensualidad y sus
+   beneficios (incluida la app), la tarifa en un mes posterior, las preguntas
+   directas de instalación o contrato y la aceptación de la demo con traspaso
+   literal. Verificar también que no insiste si se rechaza la demo ni retoma
+   cotizaciones antiguas como vigentes. Los tests con modelos falsos no
+   validan la redacción que genera el proveedor real. Antes de reactivar una
+   conversación, revisar su etiqueta actual y confirmar que nadie la esté
+   atendiendo.
+
+Revisión del 12/09/2026: la conversación 3 ya no tenía la etiqueta `humano`;
+no hay que retirarla basándose en un resumen anterior. Los estados de las
+conversaciones se comprueban en vivo, no se asumen.
+
+Para desplegar por API se necesita un token de Coolify, distinto del token
+de Chatwoot. No guardar tokens en este documento ni pegarlos en un chat.
+Consultar la [documentación de despliegues de Coolify](https://coolify.io/docs/api/endpoints/deployments/deploy-by-tag-or-uuid)
+para el método y los permisos de la versión instalada.
+
+Al finalizar la campaña, revisar el prompt antes de seguir publicitando la
+oferta. El bot no dispone de una fecha actual confiable y no desactiva la
+promoción automáticamente; no cambiar la tarifa prometida a quienes ya
+contrataron dentro del plazo.
+
+## Registro de despliegues verificados
+
+### 13/09/2026 — Demo por videollamada y app para el celular
+
+Se publicó el cambio en `main` y se desplegó únicamente `agente-ia` con
+`scripts/desplegar.py`. La campaña de Meta seguía activa durante el cambio.
+
+| Evidencia | Valor verificado |
+|---|---|
+| Commit de la versión desplegada | `ef42fbbab75371726586a3e4e776d59010fe88b4` |
+| ID del despliegue en Coolify | `wzr74l1rzexhwcjw8tpwtrha` |
+| Estado del despliegue | `finished` |
+| Estado de la aplicación al finalizar | `running:healthy` |
+| Salud pública | `estado: ok` |
+| SHA-256 del prompt efectivo | `3065e9761ddad910bae5d2595f37c0ca760a941e0f228b6da6450e8c999709b5` |
+| Pruebas automáticas | 164 aprobadas, con modelos falsos, sin consumir tokens |
+
+El prompt efectivo coincidió con el del commit publicado. Mantiene la
+mensualidad y la promoción, suma la app del celular y busca coordinar una
+demo; retira la cotización fija de instalación y la mención automática de
+permanencia. La [oferta comercial](#la-oferta-comercial) describe cómo
+responder consultas directas y hacer el traspaso.
+
+No se modificaron la rama ni el servicio del piloto, las variables de
+producción o las automatizaciones de Chatwoot. No se borraron memorias ni
+se cambiaron etiquetas. `/salud` del piloto también devolvió `ok`.
+
+**Alcance de la verificación:** se comprobó el despliegue y la identidad del
+prompt cargado. No se envió una conversación real de prueba por WhatsApp;
+la validación de las respuestas del proveedor y del recorrido de aceptación
+de la demo queda pendiente. No la des por hecha a partir de los tests ni de
+la salud del servicio.
+
+**Despliegue automático:** Coolify mostraba `is_auto_deploy_enabled=true`,
+pero el historial no registró un despliegue nuevo después del push. Se
+comprobó que no hubiera uno nuevo o pendiente antes de iniciar una única
+solicitud manual con el comando compartido. En próximos cambios, consultá
+el historial después del push antes de crear otro despliegue; no asumas que
+el indicador por sí solo demuestra que GitHub lo haya iniciado.
+
+Este registro describe lo verificado en esa fecha. Los commits posteriores
+que solo actualizan documentación no implican otro despliegue: antes de
+operar, comprobá el estado real en Coolify y la huella del prompt.
 
 ## Lo que falta antes de cobrarle a un cliente
 

@@ -12,23 +12,61 @@ Si sos una persona: leé el `README.md`, es el que está escrito para vos.
 ## ⚠️ Esto ya está en producción — leelo antes de tocar nada desplegado
 
 Este repo dejó de ser solo material didáctico. Hay **dos bots atendiendo en
-un VPS**, uno de ellos con WhatsApp real conectado, y una agencia montando
-clientes encima.
+un VPS**, uno con WhatsApp real conectado, y una agencia montando clientes
+encima.
 
 **Antes de tocar cualquier cosa desplegada, leé [docs/operacion.md](docs/operacion.md).**
 Ahí está el mapa de lo que corre de verdad: dominios, identificadores de
-Coolify, cómo se reparten las cuentas de Chatwoot, los niveles de acceso, y
+Coolify, cómo se reparten las cuentas de Chatwoot, la oferta comercial, y
 —sobre todo— las trampas que ya costaron horas y no conviene repetir.
 
-Lo mínimo que tenés que saber antes de seguir leyendo:
+Lo mínimo antes de seguir leyendo:
 
-- `agente-ia` corre la rama `main` y atiende WhatsApp real. **No desplegues
-  `main` sin probar**: del otro lado hay clientes.
-- `bot-demo` corre la rama `piloto-demo`, que suma el filtro por cuenta y
-  bandeja. Todavía no se mergeó.
-- Un contenedor **no alcanza la IP pública del propio servidor**: los DSN de
+- **`agente-ia` corre `main` y atiende WhatsApp real.** Del otro lado hay
+  prospectos de la agencia: no despliegues sin probar.
+- **`prompts/sistema.md` es la vidriera del negocio**, no un ejemplo. Vende
+  el servicio de la agencia con precios reales.
+- **El objetivo comercial es coordinar una demo por videollamada.** La
+  presentación incluye mensualidad, CRM y app para el celular; instalación
+  y contratación las conversa el asesor. No vuelvas a introducir la
+  cotización fija de instalación ni la permanencia en la respuesta inicial.
+  La política completa está en [la oferta comercial](docs/operacion.md#la-oferta-comercial)
+  y su despliegue en el [registro de producción](docs/operacion.md#registro-de-despliegues-verificados).
+- **Un contenedor no alcanza la IP pública del propio servidor**: los DSN de
   Postgres van con el host interno de Docker. Este error dejó a los dos bots
   en bucle de reinicio.
+- **Las conversaciones abiertas pueden arrastrar respuestas anteriores.**
+  Primero verificá el prompt desplegado y el comportamiento. No borres
+  memorias como rutina: el cambio comercial conserva el contexto de los
+  prospectos. Cualquier limpieza se limita a pruebas identificadas; para
+  borrados masivos rigen las condiciones de [operación](docs/operacion.md#la-memoria-arrastra-la-identidad-anterior).
+- La rama `piloto-demo` suma el filtro por cuenta y bandeja, y **todavía no
+  está mergeada a `main`**.
+
+### Despliegue compartido por Codex y Claude
+
+El procedimiento está en [docs/despliegue.md](docs/despliegue.md). Desde la
+raíz del proyecto y con su entorno de Python:
+
+```bash
+python scripts/desplegar.py comprobar
+python scripts/desplegar.py desplegar
+```
+
+`comprobar` es de lectura. `desplegar` se usa cuando el usuario pidió el
+despliegue: exige `main` limpia y subida, verifica el destino, corre los
+tests, envía una sola solicitud y sigue el resultado. Conservá el ID y el
+commit que imprime para continuar con `estado` si la sesión se interrumpe.
+No repitas el despliegue por un timeout sin comprobar primero el historial.
+
+Las credenciales se leen desde `.env.coolify.local`, excluido de Git y de
+Docker, o del entorno. `COOLIFY_TOKEN` requiere Read y Deploy; si los permisos
+vienen separados, `COOLIFY_READ_TOKEN` lleva el de lectura. Si falta la
+credencial, pedí que se guarde en ese archivo, nunca en el chat. El comando
+no necesita reiniciar el editor ni claves de un proveedor de IA.
+
+El alcance de este comando es solo `agente-ia`; no despliega `bot-demo`, no
+borra memorias y no cambia etiquetas ni ajustes del servidor.
 
 El detalle del piloto multicliente está en [docs/piloto-demo.md](docs/piloto-demo.md).
 

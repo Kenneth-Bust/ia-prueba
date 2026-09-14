@@ -351,7 +351,9 @@ async def _anotar(donde, conversacion, texto):
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def cliente(canal, agente, token="secreto", buffer_segundos=0):
+def cliente(
+    canal, agente, token="secreto", buffer_segundos=0, respuesta_minima_segundos=0
+):
     """Levanta el webhook con las piezas de mentira adentro."""
     pytest.importorskip("httpx", reason="TestClient de FastAPI necesita httpx")
     from fastapi.testclient import TestClient
@@ -363,6 +365,7 @@ def cliente(canal, agente, token="secreto", buffer_segundos=0):
     config = agente.config
     config.chatwoot_webhook_token = token
     config.buffer_segundos = buffer_segundos
+    config.respuesta_minima_segundos = respuesta_minima_segundos
 
     return TestClient(crear_app(config, agente=agente, canal=canal))
 
@@ -445,6 +448,37 @@ def test_el_salud_contesta():
 
     assert respuesta.status_code == 200
     assert respuesta.json()["estado"] == "ok"
+
+
+def test_salud_identifica_el_prompt_efectivo_y_se_actualiza(tmp_path):
+    """Un servicio sano puede estar vendiendo con el prompt del deploy viejo."""
+    import hashlib
+
+    from agente.prompts import PROMPT_DE_EMERGENCIA
+    from test_agente import agente_falso
+
+    agente = agente_falso(["hola"])
+    agente.config.prompt_sistema = tmp_path / "sistema.md"
+    agente.config.prompt_sistema.write_text("  Primera oferta\n", encoding="utf-8")
+
+    with cliente(ChatwootFalso(), agente) as web:
+        inicial = web.get("/salud").json()
+        assert inicial["prompt_sha256"] == hashlib.sha256(
+            "Primera oferta".encode("utf-8")
+        ).hexdigest()
+        assert "Primera oferta" not in str(inicial)
+
+        agente.config.prompt_sistema.write_text("Oferta revisada", encoding="utf-8")
+        actualizado = web.get("/salud").json()
+        assert actualizado["prompt_sha256"] != inicial["prompt_sha256"]
+        assert actualizado["prompt_sha256"] == hashlib.sha256(
+            "Oferta revisada".encode("utf-8")
+        ).hexdigest()
+
+        agente.config.prompt_sistema.unlink()
+        assert web.get("/salud").json()["prompt_sha256"] == hashlib.sha256(
+            PROMPT_DE_EMERGENCIA.encode("utf-8")
+        ).hexdigest()
 
 
 # -- Fotos y audios -----------------------------------------------------------
