@@ -53,10 +53,92 @@ def test_una_talla_es_una_opcion_y_el_extra_lleva_codigo():
         )
     )
 
-    assert validado["opciones"] == [{"nombre": "Talla", "valores": ["S", "M", "L"]}]
+    assert validado["opciones"] == [
+        {"nombre": "Talla", "valores": [{"valor": v, "recargo": None} for v in ("S", "M", "L")]}
+    ]
     assert validado["extras"] == [
         {"codigo": "numero_estampado", "nombre": "Número estampado", "precio": "1.00"}
     ]
+
+
+def test_un_valor_de_la_opcion_puede_costar_mas():
+    validado = validar_item(
+        item(tipo="producto", opciones=[{"nombre": "Talla", "valores": [
+            "M", {"valor": "XXL", "recargo": "2"}, {"valor": "L", "recargo": "0"},
+        ]}])
+    )
+
+    assert validado["opciones"][0]["valores"] == [
+        {"valor": "M", "recargo": None},
+        {"valor": "XXL", "recargo": "2.00"},
+        {"valor": "L", "recargo": None},
+    ]
+    with pytest.raises(DatosInvalidos, match="recargo"):
+        validar_item(item(precio="", opciones=[{"nombre": "Talla", "valores": [{"valor": "XXL", "recargo": "2"}]}]))
+    with pytest.raises(DatosInvalidos):
+        validar_item(item(opciones=[{"nombre": "Talla", "valores": [{"valor": "XXL", "recargo": "-2"}]}]))
+
+
+def test_precio_desde_y_agotado():
+    validado = validar_item(item(precio="300", precio_desde=True, agotado=True))
+
+    assert validado["precio_desde"] is True and validado["agotado"] is True
+    assert validar_item(item())["precio_desde"] is False and validar_item(item())["agotado"] is False
+    with pytest.raises(DatosInvalidos, match="referencia"):
+        validar_item(item(precio="", precio_desde=True))
+    with pytest.raises(DatosInvalidos, match="cotización automática"):
+        validar_item(item(precio_desde=True, cotizacion_automatica=True))
+    with pytest.raises(DatosInvalidos):
+        validar_item(item(agotado="sí"))
+
+
+def test_el_item_se_ofrece_solo_en_lineas_que_existen():
+    validas = ["uniformes", "sublimacion"]
+
+    assert validar_item(item(lineas=["uniformes", "uniformes"]), lineas_validas=validas)["lineas"] == ["uniformes"]
+    assert validar_item(item())["lineas"] == []
+    with pytest.raises(DatosInvalidos, match="ya no existe"):
+        validar_item(item(lineas=["masaya"]), lineas_validas=validas)
+    with pytest.raises(DatosInvalidos):
+        validar_item(item(lineas=["Con Espacio"]))
+
+
+def test_las_lineas_del_negocio_conservan_su_codigo():
+    perfil = validar_perfil({"lineas": [
+        {"nombre": "Sublimación"},
+        {"codigo": "sublimacion", "nombre": "Sublimación anterior"},
+        {"nombre": "Sucursal Masaya", "direccion": "Masaya, frente al parque", "horarios": "8:00 a 17:00"},
+    ]})
+
+    assert [linea["codigo"] for linea in perfil["lineas"]] == ["sublimacion_2", "sublimacion", "sucursal_masaya"]
+    assert perfil["lineas"][2]["direccion"] == "Masaya, frente al parque"
+    with pytest.raises(DatosInvalidos, match="repetida"):
+        validar_perfil({"lineas": [{"nombre": "Uniformes"}, {"nombre": "uniformes"}]})
+    with pytest.raises(DatosInvalidos, match="números de cuenta"):
+        validar_perfil({"lineas": [{"nombre": "Centro", "direccion": "Cuenta BAC 123456789"}]})
+
+
+def test_una_linea_borrada_saca_a_los_items_que_solo_estaban_ahi():
+    perfil = validar_perfil({"lineas": [{"codigo": "uniformes", "nombre": "Uniformes"}]})
+    anterior = {
+        "id": 4, "sku": "D-1", "tipo": "producto", "nombre": "Guardado antes", "categoria": "", "descripcion": "",
+        "precio": "1.00", "moneda": "USD", "unidad": "", "vigente_desde": None, "vigente_hasta": None,
+        "opciones": [{"nombre": "Talla", "valores": ["S"]}], "extras": [], "cotizacion_automatica": False, "activo": True,
+    }
+    items = [
+        validar_item(item(sku="A-1", lineas=["uniformes", "borrada"])) | {"id": 1},
+        validar_item(item(sku="B-1", lineas=["borrada"])) | {"id": 2},
+        validar_item(item(sku="C-1")) | {"id": 3},
+        anterior,
+    ]
+
+    contenido = armar_contenido(NEGOCIO, perfil, validar_ajustes({}), items, [])
+
+    assert [(i["sku"], i["lineas"]) for i in contenido["items"]] == [("A-1", ["uniformes"]), ("C-1", []), ("D-1", [])]
+    guardado_antes = contenido["items"][-1]
+    assert guardado_antes["opciones"] == [{"nombre": "Talla", "valores": [{"valor": "S", "recargo": None}]}]
+    assert guardado_antes["precio_desde"] is False and guardado_antes["agotado"] is False
+    assert contenido["perfil"]["lineas"][0]["codigo"] == "uniformes"
 
 
 def test_cada_item_lleva_su_moneda():

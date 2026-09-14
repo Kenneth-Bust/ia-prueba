@@ -39,6 +39,7 @@ MAXIMO_EXTRAS = 20
 MAXIMO_PREGUNTAS = 30
 MAXIMO_TRAMOS = 10
 MAXIMO_FOTOS_POR_ITEM = 5
+MAXIMO_LINEAS = 20
 
 TEXTOS_DEL_PERFIL = (
     # (clave, largo máximo, cómo se nombra en un mensaje de error)
@@ -58,15 +59,17 @@ CAMPOS_PUBLICOS_DEL_ITEM = (
     "descripcion",
     "precio",
     "moneda",
+    "precio_desde",
     "unidad",
     "vigente_desde",
     "vigente_hasta",
-    "opciones",
     "extras",
     "cotizacion_automatica",
+    "agotado",
 )
 
 _SKU = re.compile(r"[A-Z0-9](?:[A-Z0-9-]{0,30}[A-Z0-9])?")
+_CODIGO_LINEA = re.compile(r"[a-z0-9_]{1,40}")
 _NEGOCIO = re.compile(r"[a-z0-9][a-z0-9-]{1,40}")
 _IMPORTE = re.compile(r"\d{1,9}(?:\.\d{1,2})?")
 _FECHA = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -120,11 +123,16 @@ def codigo_de(texto: str) -> str:
 # -- Ítems: productos, servicios y promociones ----------------------------------
 
 
-def validar_item(datos: object, sku_actual: str | None = None) -> dict:
+def validar_item(
+    datos: object, sku_actual: str | None = None, lineas_validas: list[str] | None = None
+) -> dict:
     """Valida un ítem completo. Al editar, el código es el que ya tenía.
 
     El código no se cambia después de crearlo: lo usan las fotos, las
     publicaciones anteriores y las cotizaciones que el bot ya mandó.
+
+    `lineas_validas` son los códigos de las líneas o sucursales que el
+    negocio tiene cargadas en «Mi negocio». Con None no se comparan.
     """
     if not isinstance(datos, dict):
         raise DatosInvalidos("Faltan los datos del ítem.")
@@ -157,6 +165,20 @@ def validar_item(datos: object, sku_actual: str | None = None) -> dict:
             "apagá la cotización automática y lo cotiza una persona."
         )
 
+    # «Desde C$ 300»: el bot da la referencia y el precio final lo confirma
+    # una persona. Por eso no convive con la cotización automática.
+    precio_desde = _booleano(datos.get("precio_desde", False), "el precio «desde»")
+    if precio_desde and precio is None:
+        raise DatosInvalidos("Para mostrar un precio «desde», cargá el precio de referencia.")
+    if precio_desde and cotizacion:
+        raise DatosInvalidos(
+            "Con un precio «desde», el precio final lo confirma una persona: apagá la cotización automática."
+        )
+
+    opciones = _opciones(datos.get("opciones"))
+    if precio is None and any(v["recargo"] for o in opciones for v in o["valores"]):
+        raise DatosInvalidos("Para cobrar un recargo por opción, cargá el precio del ítem.")
+
     return {
         "sku": sku,
         "tipo": tipo,
@@ -165,12 +187,17 @@ def validar_item(datos: object, sku_actual: str | None = None) -> dict:
         "descripcion": descripcion,
         "precio": precio,
         "moneda": moneda,
+        "precio_desde": precio_desde,
         "unidad": _texto(datos, "unidad", 40, "la unidad"),
         "vigente_desde": desde,
         "vigente_hasta": hasta,
-        "opciones": _opciones(datos.get("opciones")),
+        "opciones": opciones,
         "extras": _extras(datos.get("extras")),
+        "lineas": _lineas_del_item(datos.get("lineas"), lineas_validas),
         "cotizacion_automatica": cotizacion,
+        # Agotado no es apagado: el bot lo sigue mostrando, pero avisa que no
+        # hay y no toma el pedido. Apagado, directamente no lo ofrece.
+        "agotado": _booleano(datos.get("agotado", False), "el campo Agotado"),
         "activo": _booleano(datos.get("activo", True), "el campo Activo"),
     }
 
@@ -185,7 +212,12 @@ def _sku(valor: object) -> str:
 
 
 def _opciones(valor: object) -> list[dict]:
-    """Listas sin recargo que define cada negocio: talla, color, sabor."""
+    """Listas que define cada negocio: talla, color, sabor.
+
+    Cada valor puede llevar un recargo por unidad (talla XXL +2). Llega como
+    texto suelto o como {valor, recargo}; se guarda siempre como
+    {valor, recargo}, con recargo None cuando no cambia el precio.
+    """
     if valor in (None, ""):
         return []
     if not isinstance(valor, list) or len(valor) > MAXIMO_OPCIONES:
@@ -207,7 +239,9 @@ def _opciones(valor: object) -> list[dict]:
             )
         valores, vistos = [], set()
         for crudo in crudos:
-            limpio = crudo.strip() if isinstance(crudo, str) else ""
+            entrada = crudo if isinstance(crudo, dict) else {"valor": crudo}
+            texto = entrada.get("valor")
+            limpio = texto.strip() if isinstance(texto, str) else ""
             if not limpio or len(limpio) > 40:
                 raise DatosInvalidos(
                     f"Cada valor de «{nombre}» tiene que tener entre 1 y 40 caracteres."
@@ -215,9 +249,40 @@ def _opciones(valor: object) -> list[dict]:
             if limpio.casefold() in vistos:
                 raise DatosInvalidos(f"En «{nombre}», el valor «{limpio}» está repetido.")
             vistos.add(limpio.casefold())
-            valores.append(limpio)
+            recargo = _importe(entrada.get("recargo"), f"el recargo de «{limpio}»", opcional=True)
+            valores.append({"valor": limpio, "recargo": None if recargo in (None, "0.00") else recargo})
         opciones.append({"nombre": nombre, "valores": valores})
     return opciones
+
+
+def _opciones_publicables(opciones: list) -> list[dict]:
+    """Las opciones guardadas antes del recargo eran texto suelto."""
+    return [
+        {
+            "nombre": opcion["nombre"],
+            "valores": [
+                valor if isinstance(valor, dict) else {"valor": valor, "recargo": None}
+                for valor in opcion["valores"]
+            ],
+        }
+        for opcion in opciones
+    ]
+
+
+def _lineas_del_item(valor: object, validas: list[str] | None) -> list[str]:
+    """Dónde se ofrece el ítem. Vacío quiere decir en todas las líneas."""
+    if valor in (None, ""):
+        return []
+    if not isinstance(valor, list) or any(
+        not isinstance(codigo, str) or not _CODIGO_LINEA.fullmatch(codigo) for codigo in valor
+    ):
+        raise DatosInvalidos("Elegí las líneas o sucursales de la lista.")
+    lineas = list(dict.fromkeys(valor))
+    if validas is not None and any(codigo not in validas for codigo in lineas):
+        raise DatosInvalidos(
+            "Una de las líneas o sucursales elegidas ya no existe. Revisá dónde se ofrece el ítem."
+        )
+    return lineas
 
 
 def _extras(valor: object) -> list[dict]:
@@ -252,6 +317,7 @@ def perfil_vacio() -> dict:
         "formas_de_pago": [],
         "nota_pagos": "",
         "preguntas": [],
+        "lineas": [],
     }
 
 
@@ -279,7 +345,58 @@ def validar_perfil(datos: object) -> dict:
     _sin_numeros_de_cuenta(perfil["nota_pagos"], "la nota sobre pagos", estricto=True)
 
     perfil["preguntas"] = _preguntas(datos.get("preguntas"))
+    perfil["lineas"] = _lineas_del_perfil(datos.get("lineas"))
     return perfil
+
+
+def _lineas_del_perfil(valor: object) -> list[dict]:
+    """Las líneas de WhatsApp o sucursales de un mismo negocio.
+
+    El código no cambia aunque se cambie el nombre: los ítems lo usan para
+    decir dónde se ofrecen, y cada bot, para saber qué línea atiende. Una
+    línea nueva llega sin código y se lo arma a partir del nombre.
+    """
+    if valor in (None, ""):
+        return []
+    if not isinstance(valor, list) or len(valor) > MAXIMO_LINEAS:
+        raise DatosInvalidos(f"Se pueden cargar hasta {MAXIMO_LINEAS} líneas o sucursales.")
+    if any(not isinstance(cruda, dict) for cruda in valor):
+        raise DatosInvalidos("Cada línea o sucursal lleva al menos un nombre.")
+
+    # Primero los códigos que ya existen, para que uno nuevo no tome el de
+    # una línea que aparece más abajo en la lista.
+    tomados: set[str] = set()
+    for cruda in valor:
+        codigo = cruda.get("codigo")
+        if codigo in (None, ""):
+            continue
+        if not isinstance(codigo, str) or not _CODIGO_LINEA.fullmatch(codigo):
+            raise DatosInvalidos("Una línea tiene un código inválido. Recargá la página y probá de nuevo.")
+        if codigo in tomados:
+            raise DatosInvalidos("Hay dos líneas con el mismo código. Recargá la página y probá de nuevo.")
+        tomados.add(codigo)
+
+    lineas, nombres = [], set()
+    for cruda in valor:
+        nombre = _texto(cruda, "nombre", 60, "el nombre de la línea o sucursal", obligatorio=True)
+        if nombre.casefold() in nombres:
+            raise DatosInvalidos(f"La línea o sucursal «{nombre}» está repetida.")
+        nombres.add(nombre.casefold())
+
+        codigo = cruda.get("codigo") or ""
+        if not codigo:
+            base = codigo_de(nombre)[:36] or "linea"
+            codigo, numero = base, 2
+            while codigo in tomados:
+                codigo, numero = f"{base}_{numero}", numero + 1
+            tomados.add(codigo)
+
+        direccion = _texto(cruda, "direccion", 300, f"la dirección de «{nombre}»")
+        horarios = _texto(cruda, "horarios", 600, f"los horarios de «{nombre}»")
+        _sin_numeros_de_cuenta(direccion, f"la dirección de «{nombre}»")
+        _sin_numeros_de_cuenta(horarios, f"los horarios de «{nombre}»")
+        lineas.append({"codigo": codigo, "nombre": nombre, "direccion": direccion, "horarios": horarios})
+    return lineas
 
 
 def _preguntas(valor: object) -> list[dict]:
@@ -389,6 +506,24 @@ def armar_contenido(
 
     perfil = perfil_vacio() | perfil
     ajustes = ajustes_por_defecto() | ajustes
+    lineas_existentes = {linea["codigo"] for linea in perfil["lineas"]}
+
+    def publicable(item: dict) -> dict:
+        return {campo: item[campo] for campo in CAMPOS_PUBLICOS_DEL_ITEM if campo in item} | {
+            # Valores por defecto para ítems guardados antes de estos campos.
+            "precio_desde": item.get("precio_desde", False),
+            "agotado": item.get("agotado", False),
+            "opciones": _opciones_publicables(item["opciones"]),
+            # Una línea borrada en «Mi negocio» deja de contar.
+            "lineas": [codigo for codigo in item.get("lineas", []) if codigo in lineas_existentes],
+            "fotos": fotos_por_item.get(item["id"], []),
+        }
+
+    def en_alguna_linea(item: dict) -> bool:
+        # Si se borraron todas las líneas donde se ofrecía, el ítem sale de la
+        # publicación: es más seguro que ofrecerlo de golpe en sucursales que
+        # no lo venden. Sin líneas elegidas, se ofrece en todas.
+        return not item.get("lineas") or any(codigo in lineas_existentes for codigo in item["lineas"])
 
     return {
         "formato": FORMATO_PUBLICACION,
@@ -401,10 +536,9 @@ def armar_contenido(
             "descuentos": ajustes["descuentos"],
         },
         "items": [
-            {campo: item[campo] for campo in CAMPOS_PUBLICOS_DEL_ITEM}
-            | {"fotos": fotos_por_item.get(item["id"], [])}
+            publicable(item)
             for item in sorted(items, key=lambda i: i["sku"])
-            if item["activo"]
+            if item["activo"] and en_alguna_linea(item)
         ],
     }
 

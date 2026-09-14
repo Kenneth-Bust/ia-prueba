@@ -13,12 +13,21 @@ Este documento explica cómo está hecho y cómo seguirlo.
 Cada negocio entra con su cuenta y carga:
 
 - **Catálogo**: productos, servicios y promociones de cualquier rubro. Cada
-  ítem lleva precio con su propia moneda (US$ o C$) y unidad, vigencia,
-  opciones sin recargo, extras con precio en esa misma moneda, fotos y la
-  opción de cotización automática.
+  ítem lleva:
+  - Precio con su propia moneda (US$ o C$) y unidad.
+  - La opción de que ese precio sea «desde»: el bot da la referencia y el
+    precio final lo confirma una persona.
+  - Vigencia.
+  - Opciones (talla, color, tamaño), donde un valor puede costar más.
+  - Extras con precio, en la misma moneda.
+  - Fotos.
+  - Dónde se ofrece, si el negocio tiene varias líneas o sucursales.
+  - Cotización automática, agotado y activo.
 - **Mi negocio**: nombre, a qué se dedica, dirección, mapa, horarios, formas
   de pago aceptadas, nota sobre pagos, envíos, políticas y preguntas
-  frecuentes.
+  frecuentes. También las **líneas de WhatsApp o sucursales**, cada una con
+  su dirección y horarios si son distintos. Tienen un código estable, y cada
+  bot va a usar el suyo para saber qué línea atiende.
 - **Reglas de precio**, todas opcionales y con su propio interruptor:
   - Moneda habitual: la que aparece al crear un ítem.
   - Descuentos por cantidad.
@@ -124,21 +133,33 @@ GET /api/bot/fotos/<id>            misma clave → la imagen
 {
   "formato": 1,
   "negocio": {"id": "smarth-house", "nombre": "Smarth House"},
-  "perfil": {"direccion": "…", "horarios": "…", "formas_de_pago": ["Transferencia bancaria"], "preguntas": []},
+  "perfil": {
+    "direccion": "…", "horarios": "…", "formas_de_pago": ["Transferencia bancaria"], "preguntas": [],
+    "lineas": [{"codigo": "uniformes", "nombre": "Uniformes", "direccion": "", "horarios": ""}]
+  },
   "reglas": {"cantidad_maxima": 200, "descuentos": [{"desde": 12, "porcentaje": "5"}]},
   "items": [{
-    "sku": "FUT-01", "tipo": "producto", "nombre": "…", "precio": "22.00", "moneda": "USD", "unidad": "por unidad",
-    "vigente_desde": null, "vigente_hasta": null,
-    "opciones": [{"nombre": "Talla", "valores": ["S", "M"]}],
+    "sku": "FUT-01", "tipo": "producto", "nombre": "…", "precio": "22.00", "moneda": "USD",
+    "precio_desde": false, "unidad": "por unidad", "vigente_desde": null, "vigente_hasta": null,
+    "opciones": [{"nombre": "Talla", "valores": [{"valor": "M", "recargo": null}, {"valor": "XXL", "recargo": "2.00"}]}],
     "extras": [{"codigo": "nombre_estampado", "nombre": "Nombre estampado", "precio": "1.00"}],
-    "cotizacion_automatica": true,
+    "lineas": ["uniformes"],
+    "cotizacion_automatica": true, "agotado": false,
     "fotos": [{"id": "…", "mime": "image/png", "bytes": 112233, "sha256": "…"}]
   }]
 }
 ```
 
-Solo trae ítems activos. Cada ítem trae su moneda: no hay una moneda
-general. Los importes van como texto, para no perder centavos. Las rutas internas de los archivos no salen del portal.
+Qué trae:
+
+- Solo ítems activos. Cada ítem trae su moneda: no hay una moneda general.
+- Los importes van como texto, para no perder centavos.
+- `lineas` vacío quiere decir que se ofrece en todas las líneas. Si se
+  borraron todas las líneas de un ítem, ese ítem no se publica.
+- Un ítem `agotado` se muestra, pero no se toma el pedido.
+- `precio_desde` nunca se cotiza solo.
+- El recargo de una opción se suma por unidad, igual que un extra, y no
+  lleva descuento. Las rutas internas de los archivos no salen del portal.
 
 ## Pruebas
 
@@ -174,18 +195,29 @@ Coolify y no se imprimió. Configuración:
 - Se retiraron los permisos de PUBLIC sobre la base y el esquema.
 - Se comprobó que no puede conectarse a `memoria_demo`.
 
+**Conexiones colgadas (14/09).** Detener el portal a la fuerza varias veces
+dejó sesiones abiertas del lado del servidor, que llenaron el límite de 5 del
+rol. Mientras duran, las pruebas contra PostgreSQL esperan y fallan.
+
+- El pool ahora usa como máximo 3 conexiones, confirma que cada una siga viva
+  antes de usarla y suelta las que sobran.
+- Liberar las sesiones colgadas o subir el límite del rol requiere el acceso
+  de administrador del PostgreSQL, y eso lo decide el usuario. Si no, se
+  cierran solas cuando el servidor detecta el corte.
+
 ## Lo que falta
 
 **Para que sirva a más rubros.** Revisión del 14/09, ordenada por cuántos
-negocios cubre cada punto. Ninguno está hecho ni aprobado todavía:
+negocios cubre cada punto. Ese mismo día, con el OK del usuario, se hicieron
+estos tres:
 
-1. **Opciones con precio**: talla XXL +US$ 2, tamaño grande +C$ 40. Hoy las
-   opciones no tienen recargo y los extras se suman por unidad.
-2. **Catálogo por línea o sucursal**: marcar a qué WhatsApp o sucursal
-   pertenece cada ítem, y admitir varias direcciones y horarios. El
-   prospecto de uniformes tiene dos números.
-3. **Estados «Agotado» y «Precio desde»**: el bot sigue mostrando el ítem, pero
-   avisa que no hay stock o da un precio de referencia.
+1. ✅ **Opciones con precio**: talla XXL +US$ 2, tamaño grande +C$ 40.
+2. ✅ **Líneas de WhatsApp o sucursales**: cada ítem elige dónde se ofrece,
+   y cada línea puede tener su dirección y horarios.
+3. ✅ **Estados «Agotado» y «Precio desde»**.
+
+Siguen pendientes:
+
 4. **Carga desde Excel o CSV** para catálogos grandes, como ferreterías o
    farmacias.
 5. Más adelante:

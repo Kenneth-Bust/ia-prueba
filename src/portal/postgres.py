@@ -105,6 +105,12 @@ BEGIN
     END IF;
 END $$;
 
+-- También llegaron después: dónde se ofrece el ítem, precio «desde» y
+-- agotado. Los valores por defecto dejan todo como estaba.
+ALTER TABLE items ADD COLUMN IF NOT EXISTS precio_desde boolean NOT NULL DEFAULT false;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS lineas jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE items ADD COLUMN IF NOT EXISTS agotado boolean NOT NULL DEFAULT false;
+
 CREATE TABLE IF NOT EXISTS fotos (
     id text PRIMARY KEY CHECK (id ~ '^[0-9a-f]{32}$'),
     cliente_id text NOT NULL REFERENCES clientes (id) ON DELETE CASCADE,
@@ -157,21 +163,29 @@ CREATE INDEX IF NOT EXISTS auditoria_por_cliente ON auditoria (cliente_id, en DE
 _CANDADO_DE_MIGRACION = 5_140_926
 
 _COLUMNAS_ITEM = (
-    "id, sku, tipo, nombre, categoria, descripcion, precio, moneda, unidad, vigente_desde, "
-    "vigente_hasta, opciones, extras, cotizacion_automatica, activo, actualizado_en"
+    "id, sku, tipo, nombre, categoria, descripcion, precio, moneda, precio_desde, unidad, vigente_desde, "
+    "vigente_hasta, opciones, extras, lineas, cotizacion_automatica, agotado, activo, actualizado_en"
 )
 _COLUMNAS_FOTO = "id, item_id, clave, mime, bytes, sha256, creada_en"
 
 
 class RepositorioPostgres:
-    def __init__(self, dsn: str, maximo_conexiones: int = 4) -> None:
+    def __init__(self, dsn: str, maximo_conexiones: int = 3) -> None:
         # Un pool chico: el portal lo usan pocas personas a la vez, y el
-        # PostgreSQL es el mismo que el de las memorias de los bots.
+        # PostgreSQL es el mismo que el de las memorias de los bots. Tiene que
+        # entrar en el límite del rol (5 en catalogos_pruebas) dejando lugar
+        # para el comando de administración y las pruebas: con 4 se llenó.
         self._pool = ConnectionPool(
             dsn,
             min_size=1,
             max_size=maximo_conexiones,
             kwargs={"row_factory": dict_row},
+            # Antes de prestar una conexión, confirma que sigue viva. Un corte
+            # de red o el cierre por inactividad del servidor la dejan muerta,
+            # y sin esto el primer pedido después falla.
+            check=ConnectionPool.check_connection,
+            # Suelta las conexiones que sobran después de un rato quieto.
+            max_idle=300,
             open=True,
         )
 
@@ -282,7 +296,8 @@ class RepositorioPostgres:
 
     def perfil(self, cliente_id: str) -> dict:
         fila = self._una("SELECT datos FROM perfiles WHERE cliente_id = %s", (cliente_id,))
-        return fila["datos"] if fila else perfil_vacio()
+        # Completa con los campos que se sumaron después de guardarlo.
+        return (perfil_vacio() | fila["datos"]) if fila else perfil_vacio()
 
     def guardar_perfil(self, cliente_id: str, datos: dict, usuario_id: int | None) -> None:
         self._ejecutar(
@@ -334,8 +349,9 @@ class RepositorioPostgres:
             fila = self._una(
                 f"""
                 INSERT INTO items (cliente_id, sku, tipo, nombre, categoria, descripcion, precio, moneda,
-                    unidad, vigente_desde, vigente_hasta, opciones, extras, cotizacion_automatica, activo)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    precio_desde, unidad, vigente_desde, vigente_hasta, opciones, extras, lineas,
+                    cotizacion_automatica, agotado, activo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING {_COLUMNAS_ITEM}
                 """,
                 (cliente_id, datos["sku"], *_valores_de_item(datos)),
@@ -348,8 +364,9 @@ class RepositorioPostgres:
         fila = self._una(
             f"""
             UPDATE items SET tipo = %s, nombre = %s, categoria = %s, descripcion = %s, precio = %s,
-                moneda = %s, unidad = %s, vigente_desde = %s, vigente_hasta = %s, opciones = %s, extras = %s,
-                cotizacion_automatica = %s, activo = %s, actualizado_en = now()
+                moneda = %s, precio_desde = %s, unidad = %s, vigente_desde = %s, vigente_hasta = %s,
+                opciones = %s, extras = %s, lineas = %s, cotizacion_automatica = %s, agotado = %s,
+                activo = %s, actualizado_en = now()
             WHERE cliente_id = %s AND id = %s
             RETURNING {_COLUMNAS_ITEM}
             """,
@@ -507,9 +524,9 @@ def _valores_de_item(datos: dict) -> tuple:
     return (
         datos["tipo"], datos["nombre"], datos["categoria"], datos["descripcion"],
         Decimal(datos["precio"]) if datos["precio"] is not None else None,
-        datos["moneda"], datos["unidad"], datos["vigente_desde"], datos["vigente_hasta"],
-        Jsonb(datos["opciones"]), Jsonb(datos["extras"]),
-        datos["cotizacion_automatica"], datos["activo"],
+        datos["moneda"], datos["precio_desde"], datos["unidad"], datos["vigente_desde"], datos["vigente_hasta"],
+        Jsonb(datos["opciones"]), Jsonb(datos["extras"]), Jsonb(datos["lineas"]),
+        datos["cotizacion_automatica"], datos["agotado"], datos["activo"],
     )
 
 

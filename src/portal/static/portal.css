@@ -451,6 +451,16 @@ input:disabled { background: var(--fondo); color: var(--texto-2); }
 .pregunta { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--borde-suave); border-radius: 10px; }
 .pregunta-cabecera { display: flex; gap: 10px; align-items: center; }
 
+.valores-lista { display: flex; flex-direction: column; gap: 8px; }
+.valor-fila { display: grid; grid-template-columns: minmax(0, 1fr) 180px 32px; gap: 10px; align-items: center; }
+.valor-fila .valor { justify-self: start; padding: 6px 12px; }
+.valor-encabezado { font-size: 12px; font-weight: 600; color: var(--tenue); }
+.nuevo-valor { max-width: 260px; }
+.casilla-simple { display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--texto-2); cursor: pointer; }
+.casilla-simple input { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--marino); }
+.pill-en-linea { margin-left: 8px; padding: 2px 8px; font-size: 11px; vertical-align: 2px; }
+.filtro-linea { width: auto; min-width: 190px; height: 38px; border-radius: 999px; }
+
 /* -- Reglas de precio -------------------------------------------------------------- */
 
 .reglas { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
@@ -540,4 +550,5 @@ input:disabled { background: var(--fondo); color: var(--texto-2); }
   .fila > .ocultable-chico { display: none; }
   .miniatura { width: 48px; height: 48px; }
   .lista-fila { grid-template-columns: minmax(0, 1fr) 130px 32px; }
+  .valor-fila { grid-template-columns: minmax(0, 1fr) 130px 32px; }
 }

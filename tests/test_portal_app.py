@@ -256,6 +256,32 @@ def test_el_bot_sigue_con_lo_publicado_hasta_que_se_publica_de_nuevo(portal):
     assert publicado["precio"] == "50.00" and publicado["fotos"] == []
 
 
+def test_lineas_recargos_agotado_y_precio_desde_llegan_al_bot(portal):
+    cliente = entrar(portal)
+    sin_lineas = cliente.post("/api/items", json=promocion(lineas=["centro"]), headers=CABECERA)
+    assert sin_lineas.status_code == 422 and "ya no existe" in sin_lineas.json()["error"]
+
+    perfil = cliente.put(
+        "/api/perfil", json={"lineas": [{"nombre": "Centro"}, {"nombre": "Sucursal Masaya"}]}, headers=CABECERA
+    ).json()
+    assert [linea["codigo"] for linea in perfil["lineas"]] == ["centro", "sucursal_masaya"]
+
+    creado = cliente.post("/api/items", json=promocion(
+        lineas=["centro"], precio="300", precio_desde=True, agotado=True,
+        opciones=[{"nombre": "Tamaño", "valores": ["Chico", {"valor": "Grande", "recargo": "40"}]}],
+    ), headers=CABECERA)
+    assert creado.status_code == 201, creado.text
+    cliente.post("/api/publicar", headers=CABECERA)
+
+    publicado = bot(portal).get("/api/bot/catalogo").json()["contenido"]
+    ofrecido = publicado["items"][0]
+    assert (ofrecido["lineas"], ofrecido["agotado"], ofrecido["precio_desde"]) == (["centro"], True, True)
+    assert ofrecido["opciones"][0]["valores"] == [
+        {"valor": "Chico", "recargo": None}, {"valor": "Grande", "recargo": "40.00"},
+    ]
+    assert [linea["nombre"] for linea in publicado["perfil"]["lineas"]] == ["Centro", "Sucursal Masaya"]
+
+
 def test_el_codigo_no_se_repite_ni_cambia_al_editar(portal):
     cliente = entrar(portal)
     item = cliente.post("/api/items", json=promocion(), headers=CABECERA).json()

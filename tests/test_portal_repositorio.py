@@ -123,7 +123,7 @@ def test_mi_negocio_y_reglas(repo, datos):
     assert repo.perfil(datos.a)["formas_de_pago"] == []
     assert repo.ajustes(datos.a) == {"moneda": "USD", "cantidad_maxima": None, "descuentos": []}
 
-    perfil = validar_perfil({"direccion": "Managua", "formas_de_pago": ["efectivo"]})
+    perfil = validar_perfil({"direccion": "Managua", "formas_de_pago": ["efectivo"], "lineas": [{"nombre": "Centro"}]})
     ajustes = validar_ajustes({"moneda": "NIO", "cantidad_maxima": 50, "descuentos": [{"desde": 12, "porcentaje": "5"}]})
     repo.guardar_perfil(datos.a, perfil, datos.usuario)
     repo.guardar_ajustes(datos.a, ajustes, datos.usuario)
@@ -131,6 +131,7 @@ def test_mi_negocio_y_reglas(repo, datos):
     assert repo.perfil(datos.a) == perfil
     assert repo.ajustes(datos.a) == ajustes
     assert repo.perfil(datos.b)["direccion"] == ""
+    assert repo.perfil(datos.a)["lineas"][0]["codigo"] == "centro" and repo.perfil(datos.b)["lineas"] == []
 
 
 def test_los_items_quedan_dentro_de_su_negocio(repo, datos):
@@ -138,7 +139,10 @@ def test_los_items_quedan_dentro_de_su_negocio(repo, datos):
 
     assert creado["precio"] == "22.00" and creado["vigente_hasta"] == "2026-10-11"
     assert creado["moneda"] == "USD"
-    assert creado["opciones"] == [{"nombre": "Talla", "valores": ["S", "M"]}]
+    assert creado["opciones"] == [
+        {"nombre": "Talla", "valores": [{"valor": "S", "recargo": None}, {"valor": "M", "recargo": None}]}
+    ]
+    assert (creado["precio_desde"], creado["agotado"], creado["lineas"]) == (False, False, [])
     assert "cliente_id" not in creado
     with pytest.raises(YaExiste):
         repo.crear_item(datos.a, item())
@@ -151,6 +155,13 @@ def test_los_items_quedan_dentro_de_su_negocio(repo, datos):
     actualizado = repo.actualizar_item(datos.a, creado["id"], item(sku="OTRO", precio="25.5", moneda="NIO"))
     assert actualizado["precio"] == "25.50" and actualizado["sku"] == "FUT-01"
     assert actualizado["moneda"] == "NIO"
+
+    otro = repo.actualizar_item(datos.a, creado["id"], item(
+        precio="30", precio_desde=True, agotado=True, lineas=["centro"],
+        opciones=[{"nombre": "Talla", "valores": ["S", {"valor": "XXL", "recargo": "2"}]}],
+    ))
+    assert (otro["precio_desde"], otro["agotado"], otro["lineas"]) == (True, True, ["centro"])
+    assert otro["opciones"][0]["valores"][1] == {"valor": "XXL", "recargo": "2.00"}
     assert [i["sku"] for i in repo.items(datos.a)] == ["FUT-01"]
 
 

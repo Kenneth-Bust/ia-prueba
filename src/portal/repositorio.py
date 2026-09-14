@@ -218,7 +218,7 @@ class RepositorioEnMemoria:
 
     def perfil(self, cliente_id: str) -> dict:
         with self._candado:
-            return copy.deepcopy(self._perfiles.get(cliente_id, perfil_vacio()))
+            return copy.deepcopy(perfil_vacio() | self._perfiles.get(cliente_id, {}))
 
     def guardar_perfil(self, cliente_id: str, datos: dict, usuario_id: int | None) -> None:
         with self._candado:

@@ -276,6 +276,9 @@ def crear_app(
             )
         return agrupadas
 
+    def codigos_de_lineas(cliente_id: str) -> list[str]:
+        return [linea["codigo"] for linea in repo.perfil(cliente_id)["lineas"]]
+
     @app.get("/api/items")
     def listar_items(sesion: Administrador) -> list[dict]:
         fotos = fotos_por_item(sesion["cliente_id"])
@@ -283,7 +286,7 @@ def crear_app(
 
     @app.post("/api/items", status_code=201)
     def crear_item(datos: Cuerpo, sesion: Administrador) -> dict:
-        item = validar_item(datos)
+        item = validar_item(datos, lineas_validas=codigos_de_lineas(sesion["cliente_id"]))
         try:
             creado = repo.crear_item(sesion["cliente_id"], item)
         except YaExiste:
@@ -296,7 +299,9 @@ def crear_app(
         actual = repo.item(sesion["cliente_id"], item_id)
         if actual is None:
             raise HTTPException(404, "No existe ese ítem.")
-        item = validar_item(datos, sku_actual=actual["sku"])
+        item = validar_item(
+            datos, sku_actual=actual["sku"], lineas_validas=codigos_de_lineas(sesion["cliente_id"])
+        )
         actualizado = repo.actualizar_item(sesion["cliente_id"], item_id, item)
         if actualizado is None:
             raise HTTPException(404, "No existe ese ítem.")

@@ -400,11 +400,22 @@ function miniatura(fotos) {
   return el("div", { class: "miniatura" }, icono("foto", 20));
 }
 
-function resumenDelItem(item) {
+function valorDeOpcion(valor) {
+  // Las opciones guardadas antes del recargo eran texto suelto.
+  return typeof valor === "string" ? { valor, recargo: null } : valor;
+}
+
+function nombresDeLineas(codigos, lineas) {
+  return (codigos || []).map((codigo) => lineas.find((l) => l.codigo === codigo)?.nombre).filter(Boolean);
+}
+
+function resumenDelItem(item, lineas = []) {
   const partes = [];
   if (item.descripcion) partes.push(item.descripcion);
   if (item.vigente_hasta) partes.push(`hasta el ${fecha(item.vigente_hasta)}`);
   if (item.extras.length) partes.push(`extras: ${item.extras.map((e) => e.nombre.toLowerCase()).join(", ")}`);
+  const soloEn = nombresDeLineas(item.lineas, lineas);
+  if (soloEn.length) partes.push(`solo en ${soloEn.join(", ")}`);
   return partes.join(" · ");
 }
 
@@ -415,14 +426,20 @@ function tipoDelItem(item) {
 
 function resumenDeOpciones(item) {
   if (!item.opciones.length) return "—";
-  return item.opciones.map((o) => `${o.nombre}: ${o.valores.join(" · ")}`).join(" / ");
+  return item.opciones.map((o) => `${o.nombre}: ${o.valores.map(valorDeOpcion)
+    .map((v) => (v.recargo ? `${v.valor} (+${v.recargo})` : v.valor)).join(" · ")}`).join(" / ");
 }
 
 function celdaDePrecio(item, moneda) {
   return el("span", { class: "celda-precio ocultable-chico" },
     item.precio === null
       ? el("small", {}, "Lo cotiza una persona")
-      : [dinero(item.precio, item.moneda || moneda), item.unidad ? el("small", {}, item.unidad) : null]);
+      : [`${item.precio_desde ? "Desde " : ""}${dinero(item.precio, item.moneda || moneda)}`,
+        item.unidad ? el("small", {}, item.unidad) : null]);
+}
+
+function nombreConEstado(item) {
+  return el("strong", {}, item.nombre, item.agotado ? el("span", { class: "pill pill-aviso pill-en-linea" }, "Agotado") : null);
 }
 
 function filaDeEncabezado(empleado = false) {
@@ -438,9 +455,12 @@ function filaDeEncabezado(empleado = false) {
 // -- Catálogo (administrador) --------------------------------------------------------------
 
 async function vistaCatalogo(principal) {
-  estado.items = await api("GET", "/api/items");
+  const [items, perfil] = await Promise.all([api("GET", "/api/items"), api("GET", "/api/perfil")]);
+  estado.items = items;
+  const { lineas } = perfil;
   let texto = "";
   let tipo = "";
+  let linea = "";
   const chips = el("div", { class: "chips" });
   const cuerpo = el("div", { class: "columna" });
   const agregar = () => irA("editor");
@@ -462,12 +482,13 @@ async function vistaCatalogo(principal) {
       return;
     }
     const visibles = estado.items.filter((i) => (!tipo || i.tipo === tipo)
+      && (!linea || !i.lineas?.length || i.lineas.includes(linea))
       && (!texto || `${i.nombre} ${i.sku} ${i.categoria}`.toLowerCase().includes(texto)));
     const activos = estado.items.filter((i) => i.activo).length;
     const descuentos = estado.ajustes?.descuentos || [];
     pintarEn(cuerpo, 
       el("div", { class: "tabla" }, filaDeEncabezado(),
-        visibles.length ? visibles.map(filaDelCatalogo) : el("div", { class: "vacio" }, "Nada coincide con la búsqueda.")),
+        visibles.length ? visibles.map((item) => filaDelCatalogo(item, lineas)) : el("div", { class: "vacio" }, "Nada coincide con la búsqueda.")),
       el("div", { class: "pie-tabla" },
         el("span", {}, `${activos} activos de ${estado.items.length}`),
         el("span", {}, descuentos.length
@@ -485,16 +506,21 @@ async function vistaCatalogo(principal) {
       el("label", { class: "buscador" }, icono("buscar"),
         el("input", { type: "search", placeholder: "Buscar por nombre, código o categoría", "aria-label": "Buscar",
           oninput: (e) => { texto = e.target.value.trim().toLowerCase(); pintar(); } })),
-      chips),
+      chips,
+      lineas.length
+        ? el("select", { class: "filtro-linea", "aria-label": "Filtrar por línea o sucursal",
+          onchange: (e) => { linea = e.target.value; pintar(); } },
+        el("option", { value: "" }, "Todas las líneas"), lineas.map((l) => el("option", { value: l.codigo }, l.nombre)))
+        : null),
     cuerpo);
   pintar();
 }
 
-function filaDelCatalogo(item) {
-  const resumen = resumenDelItem(item);
+function filaDelCatalogo(item, lineas = []) {
+  const resumen = resumenDelItem(item, lineas);
   return el("div", { class: "fila" },
     miniatura(item.fotos),
-    el("div", { class: "nombre-item" }, el("strong", {}, item.nombre), el("span", { title: resumen }, resumen || tipoDelItem(item))),
+    el("div", { class: "nombre-item" }, nombreConEstado(item), el("span", { title: resumen }, resumen || tipoDelItem(item))),
     el("span", { class: "celda mono ocultable" }, item.sku),
     el("span", { class: "celda ocultable" }, tipoDelItem(item)),
     celdaDePrecio(item),
@@ -507,11 +533,18 @@ function filaDelCatalogo(item) {
 
 async function vistaEditor(principal, original) {
   if (!estado.ajustes) await cargarAjustes();
+  const { lineas } = await api("GET", "/api/perfil");
   const nuevo = !original;
   const b = original ? structuredClone(original) : {
-    tipo: "producto", sku: "", nombre: "", categoria: "", descripcion: "", precio: null, moneda: estado.ajustes?.moneda || "USD", unidad: "",
-    vigente_desde: null, vigente_hasta: null, opciones: [], extras: [], cotizacion_automatica: false, activo: true, fotos: [],
+    tipo: "producto", sku: "", nombre: "", categoria: "", descripcion: "", precio: null, moneda: estado.ajustes?.moneda || "USD",
+    precio_desde: false, unidad: "", vigente_desde: null, vigente_hasta: null, opciones: [], extras: [], lineas: [],
+    cotizacion_automatica: false, agotado: false, activo: true, fotos: [],
   };
+  // En pantalla cada valor de opción es {valor, recargo}, con el recargo como texto editable.
+  b.opciones = b.opciones.map((o) => ({
+    nombre: o.nombre, valores: o.valores.map(valorDeOpcion).map((v) => ({ valor: v.valor, recargo: v.recargo ?? "" })),
+  }));
+  b.lineas = b.lineas || [];
 
   const tipo = el("select", {}, Object.entries(estado.sesion.listas.tipos)
     .map(([valor, texto]) => el("option", { value: valor, selected: b.tipo === valor }, texto)));
@@ -522,13 +555,19 @@ async function vistaEditor(principal, original) {
   const precio = el("input", { type: "text", inputmode: "decimal", value: b.precio ?? "", placeholder: "0.00", "aria-label": "Precio" });
   const moneda = el("select", { "aria-label": "Moneda del precio" },
     Object.keys(MONEDAS_LARGAS).map((valor) => el("option", { value: valor, selected: (b.moneda || "USD") === valor }, simbolo(valor))));
-  // Los extras se cobran en la misma moneda: al cambiarla, cambia su prefijo.
-  moneda.addEventListener("change", () => pintarExtras());
+  // Extras y recargos se cobran en la misma moneda: al cambiarla, cambia su prefijo.
+  moneda.addEventListener("change", () => { pintarExtras(); pintarOpciones(); });
   const descripcion = el("textarea", { maxlength: 600, rows: 3, value: b.descripcion });
   const desde = el("input", { type: "date", value: b.vigente_desde || "" });
   const hasta = el("input", { type: "date", value: b.vigente_hasta || "" });
   const activo = el("input", { type: "checkbox", checked: b.activo });
   const cotizacion = el("input", { type: "checkbox", checked: b.cotizacion_automatica });
+  const precioDesde = el("input", { type: "checkbox", checked: b.precio_desde });
+  const agotado = el("input", { type: "checkbox", checked: b.agotado });
+  const casillasDeLineas = lineas.map((l) => el("input", { type: "checkbox", value: l.codigo, checked: b.lineas.includes(l.codigo) }));
+  // Un precio «desde» lo confirma una persona: no lo puede calcular el bot.
+  precioDesde.addEventListener("change", () => { if (precioDesde.checked) cotizacion.checked = false; });
+  cotizacion.addEventListener("change", () => { if (cotizacion.checked) precioDesde.checked = false; });
   const vistaDelBot = el("p", {});
   const contOpciones = el("div", { class: "columna" });
   const contExtras = el("div", { class: "lista" });
@@ -547,35 +586,56 @@ async function vistaEditor(principal, original) {
     const partes = [];
     const importe = precio.value.trim().replace(",", ".");
     const nombreVisible = nombre.value.trim() || "Nombre del ítem";
-    partes.push(/^\d+(\.\d{1,2})?$/.test(importe)
-      ? `${nombreVisible}: ${simbolo(moneda.value)} ${Number(importe).toFixed(2)}${unidad.value.trim() ? ` ${unidad.value.trim()}` : ""}.`
-      : `${nombreVisible}. El precio te lo confirma una persona del equipo.`);
+    const conMoneda = (valor) => `${simbolo(moneda.value)} ${Number(valor).toFixed(2)}`;
+    const porUnidad = unidad.value.trim() ? ` ${unidad.value.trim()}` : "";
+    if (!/^\d+(\.\d{1,2})?$/.test(importe)) {
+      partes.push(`${nombreVisible}. El precio te lo confirma una persona del equipo.`);
+    } else if (precioDesde.checked) {
+      partes.push(`${nombreVisible}: desde ${conMoneda(importe)}${porUnidad}. El precio final te lo confirma una persona del equipo.`);
+    } else {
+      partes.push(`${nombreVisible}: ${conMoneda(importe)}${porUnidad}.`);
+    }
     if (descripcion.value.trim()) partes.push(conPunto(descripcion.value.trim()));
     if (hasta.value) partes.push(`Válido hasta el ${fecha(hasta.value)}.`);
+    const recargo = (valor) => {
+      const limpio = String(valor ?? "").trim().replace(",", ".");
+      return /^\d+(\.\d{1,2})?$/.test(limpio) && Number(limpio) > 0 ? ` (+${conMoneda(limpio)})` : "";
+    };
     const opciones = b.opciones.filter((o) => o.nombre.trim() && o.valores.length);
-    if (opciones.length) partes.push(`${opciones.map((o) => `${o.nombre.trim()}: ${o.valores.join(", ")}`).join(". ")}.`);
+    if (opciones.length) {
+      partes.push(`${opciones.map((o) => `${o.nombre.trim()}: ${o.valores.map((v) => `${v.valor}${recargo(v.recargo)}`).join(", ")}`).join(". ")}.`);
+    }
     const extras = b.extras.filter((e) => e.nombre.trim());
     if (extras.length) partes.push(`Podés sumarle ${extras.map((e) => e.nombre.trim().toLowerCase()).join(" o ")}.`);
+    if (agotado.checked) partes.push("Por ahora está agotado.");
     return `«${partes.join(" ")}»`;
   }
 
   function pintarOpciones() {
-    pintarEn(contOpciones, 
-      ...b.opciones.map((opcion, i) => el("div", { class: "opcion-editor" },
+    pintarEn(contOpciones,
+      b.opciones.map((opcion, i) => el("div", { class: "opcion-editor" },
         el("div", { class: "opcion-cabecera" },
-          el("input", { type: "text", value: opcion.nombre, maxlength: 40, placeholder: "Talla, color, sabor…", "aria-label": "Nombre de la opción",
+          el("input", { type: "text", value: opcion.nombre, maxlength: 40, placeholder: "Talla, color, tamaño…", "aria-label": "Nombre de la opción",
             oninput: (e) => { opcion.nombre = e.target.value; } }),
           el("button", { class: "quitar", type: "button", title: "Quitar opción", "aria-label": "Quitar opción",
             onclick: () => { b.opciones.splice(i, 1); pintarOpciones(); cambio(); } }, "×")),
-        el("div", { class: "valores" },
-          opcion.valores.map((valor, j) => el("span", { class: "valor" }, valor,
-            el("button", { type: "button", "aria-label": `Quitar ${valor}`,
-              onclick: () => { opcion.valores.splice(j, 1); pintarOpciones(); cambio(); } }, "×"))),
-          el("input", { type: "text", maxlength: 40, placeholder: "Agregar valor", title: "Escribí el valor y apretá Enter", "aria-label": "Agregar un valor", "data-opcion": i,
-            onkeydown: (e) => {
-              if (e.key === "Enter" || e.key === ",") { e.preventDefault(); agregarValores(i, e.target.value); }
-            },
-            onblur: (e) => { if (e.target.value.trim()) agregarValores(i, e.target.value, false); } })))),
+        opcion.valores.length
+          ? el("div", { class: "valores-lista" },
+            el("div", { class: "valor-fila valor-encabezado" }, el("span", {}, "Valor"), el("span", {}, "Cuesta más (opcional)"), el("span", {})),
+            opcion.valores.map((valor, j) => el("div", { class: "valor-fila" },
+              el("span", { class: "valor" }, valor.valor),
+              el("label", { class: "con-prefijo" }, el("span", {}, `+ ${simbolo(moneda.value)}`),
+                el("input", { type: "text", inputmode: "decimal", value: valor.recargo, placeholder: "0.00", "aria-label": `Recargo de ${valor.valor}`,
+                  oninput: (e) => { valor.recargo = e.target.value; } })),
+              el("button", { class: "quitar", type: "button", "aria-label": `Quitar ${valor.valor}`,
+                onclick: () => { opcion.valores.splice(j, 1); pintarOpciones(); cambio(); } }, "×"))))
+          : null,
+        el("input", { class: "nuevo-valor", type: "text", maxlength: 40, placeholder: "Agregar valor y Enter",
+          title: "Escribí el valor y apretá Enter. Podés separar varios con comas.", "aria-label": "Agregar un valor", "data-opcion": i,
+          onkeydown: (e) => {
+            if (e.key === "Enter" || e.key === ",") { e.preventDefault(); agregarValores(i, e.target.value); }
+          },
+          onblur: (e) => { if (e.target.value.trim()) agregarValores(i, e.target.value, false); } }))),
       el("button", { class: "agregar", type: "button",
         onclick: () => { b.opciones.push({ nombre: "", valores: [] }); pintarOpciones(); cambio(); } }, "+ Agregar opción"));
   }
@@ -584,7 +644,7 @@ async function vistaEditor(principal, original) {
     const opcion = b.opciones[indice];
     if (!opcion) return;
     for (const valor of texto.split(",").map((v) => v.trim()).filter(Boolean)) {
-      if (!opcion.valores.some((v) => v.toLowerCase() === valor.toLowerCase())) opcion.valores.push(valor);
+      if (!opcion.valores.some((v) => v.valor.toLowerCase() === valor.toLowerCase())) opcion.valores.push({ valor, recargo: "" });
     }
     pintarOpciones();
     cambio();
@@ -655,11 +715,17 @@ async function vistaEditor(principal, original) {
   function datosDelFormulario() {
     return {
       tipo: tipo.value, sku: sku.value, nombre: nombre.value, categoria: categoria.value,
-      descripcion: descripcion.value, precio: precio.value.trim() || null, moneda: moneda.value, unidad: unidad.value,
+      descripcion: descripcion.value, precio: precio.value.trim() || null, moneda: moneda.value,
+      precio_desde: precioDesde.checked, unidad: unidad.value,
       vigente_desde: desde.value || null, vigente_hasta: hasta.value || null,
-      opciones: b.opciones.filter((o) => o.nombre.trim() || o.valores.length).map((o) => ({ nombre: o.nombre, valores: o.valores })),
+      opciones: b.opciones.filter((o) => o.nombre.trim() || o.valores.length).map((o) => ({
+        nombre: o.nombre,
+        valores: o.valores.map((v) => ({ valor: v.valor, recargo: String(v.recargo ?? "").trim() || null })),
+      })),
       extras: b.extras.filter((e) => e.nombre.trim() || String(e.precio ?? "").trim()).map((e) => ({ nombre: e.nombre, precio: e.precio })),
+      lineas: casillasDeLineas.filter((c) => c.checked).map((c) => c.value),
       cotizacion_automatica: cotizacion.checked,
+      agotado: agotado.checked,
       activo: activo.checked,
     };
   }
@@ -715,15 +781,23 @@ async function vistaEditor(principal, original) {
             campo("Nombre", nombre, { ancho: true }),
             campo("Precio", el("div", { class: "precio-con-moneda" }, moneda, precio), { ayuda: "Vacío: lo cotiza una persona del equipo." }),
             campo("Unidad", unidad),
+            el("label", { class: "casilla-simple ancho-completo" }, precioDesde,
+              el("span", {}, "Es un precio «desde»: el bot da esta referencia y el precio final lo confirma una persona.")),
             campo("Categoría", categoria, { ancho: true }),
             campo("Descripción o qué incluye", descripcion, { ancho: true }),
             campo("Vigente desde", desde, { ayuda: "Opcional." }),
             campo("Vigente hasta", hasta, { ayuda: "Opcional. Fuera de las fechas, el bot no lo ofrece." }))),
         el("section", { class: "tarjeta" }, el("h2", {}, "Opciones y extras"),
-          el("p", { class: "tarjeta-ayuda" }, "Opciones sin recargo, como talla, color o sabor. Extras con precio por unidad, como nombre estampado."),
+          el("p", { class: "tarjeta-ayuda" }, "Opciones como talla, color o tamaño; si un valor cuesta más, poné cuánto más. Extras con precio por unidad, como nombre estampado."),
           contOpciones, contExtras),
+        lineas.length
+          ? el("section", { class: "tarjeta" }, el("h2", {}, "Dónde se ofrece"),
+            el("p", { class: "tarjeta-ayuda" }, "Marcá las líneas de WhatsApp o sucursales donde el bot lo ofrece. Si no marcás ninguna, se ofrece en todas."),
+            el("div", { class: "casillas" }, casillasDeLineas.map((casilla, i) => el("label", { class: "casilla" }, casilla, lineas[i].nombre))))
+          : null,
         el("section", { class: "tarjeta interruptores" },
           interruptor(activo, "Activo", "Si lo apagás, el bot deja de ofrecerlo."),
+          interruptor(agotado, "Agotado", "El bot lo sigue mostrando, pero avisa que no hay y no toma el pedido."),
           interruptor(cotizacion, "Cotización automática", "Encendida, el bot calcula el precio con tus reglas. Apagada, pasa el pedido a una persona del equipo.")))),
     selectorDeFoto);
 
@@ -755,6 +829,32 @@ async function vistaNegocio(principal) {
     .map((valor) => el("input", { type: "checkbox", value: valor, checked: perfil.formas_de_pago.includes(valor) }));
   const preguntas = structuredClone(perfil.preguntas || []);
   const contPreguntas = el("div", { class: "columna" });
+  const lineas = structuredClone(perfil.lineas || []).map((l) => ({ direccion: "", horarios: "", ...l }));
+  const contLineas = el("div", { class: "columna" });
+
+  function pintarLineas() {
+    pintarEn(contLineas,
+      lineas.map((linea, i) => el("div", { class: "pregunta" },
+        el("div", { class: "pregunta-cabecera" },
+          el("input", { type: "text", value: linea.nombre, maxlength: 60, placeholder: "Por ejemplo: Uniformes, Sucursal Masaya",
+            "aria-label": "Nombre de la línea o sucursal", oninput: (e) => { linea.nombre = e.target.value; } }),
+          el("button", { class: "quitar", type: "button", "aria-label": "Quitar línea o sucursal",
+            onclick: () => {
+              if (linea.codigo && !confirm(`¿Quitar «${linea.nombre}»? Los ítems que solo se ofrecían ahí dejan de ofrecerse hasta que les elijas otra línea.`)) return;
+              lineas.splice(i, 1);
+              pintarLineas();
+              estado.sucio = true;
+            } }, "×")),
+        el("div", { class: "rejilla-2" },
+          campo("Dirección, si es distinta", el("textarea", { rows: 2, maxlength: 300, value: linea.direccion,
+            oninput: (e) => { linea.direccion = e.target.value; } })),
+          campo("Horarios, si son distintos", el("textarea", { rows: 2, maxlength: 600, value: linea.horarios,
+            oninput: (e) => { linea.horarios = e.target.value; } }))))),
+      lineas.length < 20
+        ? el("button", { class: "agregar", type: "button",
+          onclick: () => { lineas.push({ nombre: "", direccion: "", horarios: "" }); pintarLineas(); estado.sucio = true; } }, "+ Agregar línea o sucursal")
+        : null);
+  }
 
   function pintarPreguntas() {
     pintarEn(contPreguntas, 
@@ -776,9 +876,14 @@ async function vistaNegocio(principal) {
     const datos = Object.fromEntries(Object.entries(controles).map(([clave, control]) => [clave, control.value]));
     datos.formas_de_pago = casillas.filter((c) => c.checked).map((c) => c.value);
     datos.preguntas = preguntas.filter((p) => p.pregunta.trim() || p.respuesta.trim());
+    datos.lineas = lineas.filter((l) => l.nombre.trim() || l.direccion.trim() || l.horarios.trim());
     boton.disabled = true;
     try {
-      await api("PUT", "/api/perfil", datos);
+      const guardado = await api("PUT", "/api/perfil", datos);
+      // Las líneas nuevas vuelven con su código. Sin esto, un segundo guardado
+      // les armaría otro y los ítems perderían la referencia.
+      lineas.splice(0, lineas.length, ...guardado.lineas);
+      pintarLineas();
       estado.sucio = false;
       avisar("Guardado. Publicá para que el bot use estos datos.");
       refrescarEstadoSinFrenar();
@@ -804,6 +909,9 @@ async function vistaNegocio(principal) {
           campo("A qué se dedica", controles.descripcion, { ancho: true }),
           campo("Dirección", controles.direccion),
           campo("Horarios", controles.horarios))),
+      el("section", { class: "tarjeta" }, el("h2", {}, "Líneas de WhatsApp y sucursales"),
+        el("p", { class: "tarjeta-ayuda" }, "Solo si tenés más de un WhatsApp o más de una sucursal. Después, en cada ítem elegís dónde se ofrece. Con uno solo, dejalo vacío."),
+        contLineas),
       el("section", { class: "tarjeta" }, el("h2", {}, "Pagos"),
         el("div", { class: "aviso" }, icono("info", 20), el("span", {},
           "Los pagos los atiende una persona del equipo. El bot puede decir qué formas de pago aceptás, pero cuando alguien quiere pagar, pide una cuenta o manda un comprobante, le pasa la conversación a una persona. Por eso acá no se cargan números de cuenta.")),
@@ -816,6 +924,7 @@ async function vistaNegocio(principal) {
         contPreguntas),
       el("div", { class: "acciones" }, botonPrimario("Guardar cambios", guardar))));
   pintarPreguntas();
+  pintarLineas();
 }
 
 // -- Reglas de precio (administrador) ----------------------------------------------------------
@@ -849,7 +958,7 @@ async function vistaReglas(principal) {
 
   const resumen = el("div", { class: "columna resumen" });
   // Los descuentos solo los usa el bot en ítems con precio y cotización automática.
-  const paraProbar = items.filter((i) => i.precio !== null && i.cotizacion_automatica);
+  const paraProbar = items.filter((i) => i.precio !== null && i.cotizacion_automatica && !i.agotado && !i.precio_desde);
   const itemDePrueba = el("select", { "aria-label": "Ítem para probar" },
     paraProbar.map((i) => el("option", { value: i.id }, i.nombre)));
   const cantidadDePrueba = el("input", { type: "text", inputmode: "numeric", "aria-label": "Cantidad para probar" });
@@ -1128,7 +1237,7 @@ async function vistaPublicado(principal) {
     const visibles = contenido.items.filter((i) => `${i.nombre} ${i.sku} ${i.categoria}`.toLowerCase().includes(texto));
     pintarEn(cuerpo, filaDeEncabezado(true),
       ...(visibles.length
-        ? visibles.map((i) => filaPublicada(i, contenido.moneda, hoy))
+        ? visibles.map((i) => filaPublicada(i, contenido.moneda, hoy, contenido.perfil.lineas || []))
         : [el("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));
   }
 
@@ -1145,14 +1254,15 @@ async function vistaPublicado(principal) {
   pintar();
 }
 
-function filaPublicada(item, moneda, hoy) {
+function filaPublicada(item, moneda, hoy, lineas = []) {
   let pill = el("span", { class: "pill pill-ok ocultable" }, "Disponible");
   if (item.vigente_hasta && item.vigente_hasta < hoy) pill = el("span", { class: "pill pill-apagado ocultable" }, "Vencido");
+  else if (item.agotado) pill = el("span", { class: "pill pill-aviso ocultable" }, "Agotado");
   else if (item.vigente_desde && item.vigente_desde > hoy) pill = el("span", { class: "pill pill-aviso ocultable" }, `Desde ${fecha(item.vigente_desde)}`);
-  const resumen = resumenDelItem(item);
+  const resumen = resumenDelItem(item, lineas);
   return el("div", { class: "fila" },
     miniatura(item.fotos),
-    el("div", { class: "nombre-item" }, el("strong", {}, item.nombre), el("span", { title: resumen }, resumen || tipoDelItem(item))),
+    el("div", { class: "nombre-item" }, nombreConEstado(item), el("span", { title: resumen }, resumen || tipoDelItem(item))),
     el("span", { class: "celda mono ocultable" }, item.sku),
     el("span", { class: "celda ocultable" }, tipoDelItem(item)),
     celdaDePrecio(item, moneda),
@@ -1177,6 +1287,11 @@ async function vistaNegocioPublicado(principal) {
         filas.length
           ? el("dl", { class: "datos-lectura" }, filas.flatMap(([clave, valor]) => [el("dt", {}, clave), el("dd", {}, valor)]))
           : el("p", { class: "tenue" }, "Todavía no hay datos publicados.")),
+      perfil?.lineas?.length
+        ? el("section", { class: "tarjeta" }, el("h2", {}, "Líneas de WhatsApp y sucursales"),
+          el("dl", { class: "datos-lectura" }, perfil.lineas.flatMap((l) => [el("dt", {}, l.nombre),
+            el("dd", {}, [l.direccion, l.horarios].filter(Boolean).join(" · ") || "Misma dirección y horarios del negocio.")])))
+        : null,
       perfil?.preguntas.length
         ? el("section", { class: "tarjeta" }, el("h2", {}, "Preguntas frecuentes"),
           el("dl", { class: "datos-lectura" }, perfil.preguntas.flatMap((p) => [el("dt", {}, p.pregunta), el("dd", {}, p.respuesta)])))
