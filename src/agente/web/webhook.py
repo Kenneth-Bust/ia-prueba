@@ -257,6 +257,11 @@ async def _enviar_con_ritmo(
 
     Con un solo mensaje esto no hace nada, que es el caso más común.
     """
+    # Sin texto pero con fotos aprobadas igual hay algo que entregar. El
+    # canal decide cómo se manda un mensaje que es solo la imagen.
+    if adjuntos and not mensajes:
+        mensajes = [""]
+
     for i, texto in enumerate(mensajes):
         if i == 0 and adjuntos:
             await asyncio.to_thread(canal.enviar, conversacion, [texto], adjuntos)

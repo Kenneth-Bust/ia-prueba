@@ -1,0 +1,97 @@
+{
+  "version": "2026-09-14",
+  "negocio": "Uniformes y Sublimación Demo",
+  "ficticio": true,
+  "moneda": "USD",
+  "cantidad_maxima_automatica": 200,
+  "descuentos_por_cantidad": [
+    {"desde": 12, "porcentaje": "5"},
+    {"desde": 24, "porcentaje": "10"}
+  ],
+  "productos": [
+    {
+      "sku": "FUT-01",
+      "nombre": "Uniforme de fútbol azul y blanco",
+      "categoria": "Fútbol",
+      "incluye": "Camiseta y pantalón",
+      "precio_base": "22.00",
+      "tallas": ["S", "M", "L", "XL"],
+      "extras": [
+        {"codigo": "nombre", "nombre": "Nombre estampado", "precio": "1.00"},
+        {"codigo": "numero", "nombre": "Número estampado", "precio": "1.00"}
+      ],
+      "imagen": "recursos/demo_uniformes/fut-01.png",
+      "cotizacion_automatica": true,
+      "activo": true
+    },
+    {
+      "sku": "FUT-02",
+      "nombre": "Uniforme de fútbol rojo y negro",
+      "categoria": "Fútbol",
+      "incluye": "Camiseta y pantalón",
+      "precio_base": "24.00",
+      "tallas": ["S", "M", "L", "XL"],
+      "extras": [
+        {"codigo": "nombre", "nombre": "Nombre estampado", "precio": "1.00"},
+        {"codigo": "numero", "nombre": "Número estampado", "precio": "1.00"}
+      ],
+      "imagen": "recursos/demo_uniformes/fut-02.png",
+      "cotizacion_automatica": true,
+      "activo": true
+    },
+    {
+      "sku": "BEI-01",
+      "nombre": "Uniforme de béisbol blanco y azul",
+      "categoria": "Béisbol",
+      "incluye": "Camisa y pantalón",
+      "precio_base": "32.00",
+      "tallas": ["S", "M", "L", "XL"],
+      "extras": [
+        {"codigo": "nombre", "nombre": "Nombre estampado", "precio": "1.00"},
+        {"codigo": "numero", "nombre": "Número estampado", "precio": "1.00"}
+      ],
+      "imagen": "recursos/demo_uniformes/bei-01.png",
+      "cotizacion_automatica": true,
+      "activo": true
+    },
+    {
+      "sku": "BEI-02",
+      "nombre": "Uniforme de béisbol gris y rojo",
+      "categoria": "Béisbol",
+      "incluye": "Camisa y pantalón",
+      "precio_base": "34.00",
+      "tallas": ["S", "M", "L", "XL"],
+      "extras": [
+        {"codigo": "nombre", "nombre": "Nombre estampado", "precio": "1.00"},
+        {"codigo": "numero", "nombre": "Número estampado", "precio": "1.00"}
+      ],
+      "imagen": "recursos/demo_uniformes/bei-02.png",
+      "cotizacion_automatica": true,
+      "activo": true
+    },
+    {
+      "sku": "SUB-01",
+      "nombre": "Taza blanca sublimada",
+      "categoria": "Sublimación",
+      "incluye": "Una taza con diseño de muestra",
+      "precio_base": "8.00",
+      "tallas": [],
+      "extras": [],
+      "imagen": "recursos/demo_uniformes/sub-01.png",
+      "cotizacion_automatica": true,
+      "activo": true
+    },
+    {
+      "sku": "SUB-02",
+      "nombre": "Camiseta sublimada",
+      "categoria": "Sublimación",
+      "incluye": "Una camiseta con diseño de muestra",
+      "precio_base": "15.00",
+      "tallas": ["S", "M", "L", "XL"],
+      "extras": [],
+      "imagen": "recursos/demo_uniformes/sub-02.png",
+      "cotizacion_automatica": true,
+      "activo": true
+    }
+  ]
+}

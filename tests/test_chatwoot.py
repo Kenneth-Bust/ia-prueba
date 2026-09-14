@@ -656,6 +656,92 @@ def test_el_webhook_pasa_adjuntos_solo_en_el_primer_globo(tmp_path):
     assert llamadas == [("primero", [adjunto]), ("segundo", None)]
 
 
+def test_el_webhook_manda_las_fotos_aunque_no_haya_texto(tmp_path):
+    from agente.web.webhook import _enviar_con_ritmo
+
+    adjunto = AdjuntoSaliente(
+        tmp_path / "promo.png", "promo.png", "image/png", "PROMO-1"
+    )
+    canal = ChatwootFalso()
+    llamadas = []
+    canal.enviar = lambda conversacion, mensajes, adjuntos=None: llamadas.append(
+        (mensajes, adjuntos)
+    )
+
+    asyncio.run(
+        _enviar_con_ritmo(canal, "12", [], ritmo=False, adjuntos=[adjunto])
+    )
+
+    assert llamadas == [([""], [adjunto])]
+
+
+def test_la_foto_sale_aunque_el_modelo_no_escriba_texto(tmp_path):
+    adjunto = AdjuntoSaliente(
+        tmp_path / "promo.png", "promo.png", "image/png", "PROMO-1"
+    )
+    canal = ChatwootFalso()
+    envios_con_archivo = []
+    canal._api_archivos = lambda camino, texto, adjuntos: envios_con_archivo.append(
+        (camino, texto, adjuntos)
+    )
+
+    canal.enviar("12", [], [adjunto])
+
+    assert envios_con_archivo == [("conversations/12/messages", "", [adjunto])]
+    assert canal.envios() == []
+
+
+def test_si_no_se_sabe_si_llego_la_imagen_no_se_reenvia(tmp_path):
+    """Un tiempo agotado no es un rechazo: Chatwoot pudo haber creado el mensaje."""
+    from agente.canales.chatwoot import EnvioIncierto
+
+    adjunto = AdjuntoSaliente(
+        tmp_path / "promo.png", "promo.png", "image/png", "PROMO-1"
+    )
+    canal = ChatwootFalso()
+
+    def agotar(*args):
+        raise EnvioIncierto("sin confirmación")
+
+    canal._api_archivos = agotar
+    canal.enviar("12", ["La promoción cuesta US$ 45."], [adjunto])
+
+    assert canal.envios() == [], "reenviar duplicaría el mensaje"
+
+
+@pytest.mark.parametrize("caso", ["tiempo", "url_con_tiempo", "conexion_negada"])
+def test_solo_el_tiempo_agotado_cuenta_como_envio_incierto(tmp_path, monkeypatch, caso):
+    import urllib.error
+
+    from agente.canales import chatwoot as modulo
+
+    fallas = {
+        "tiempo": (TimeoutError("timed out"), modulo.EnvioIncierto),
+        "url_con_tiempo": (
+            urllib.error.URLError(TimeoutError("timed out")),
+            modulo.EnvioIncierto,
+        ),
+        # Una conexión negada nunca llegó a Chatwoot: se puede mandar el texto.
+        "conexion_negada": (
+            urllib.error.URLError(ConnectionRefusedError("refused")),
+            urllib.error.URLError,
+        ),
+    }
+    falla, esperado = fallas[caso]
+    imagen = tmp_path / "promo.png"
+    imagen.write_bytes(b"\x89PNG\r\n\x1a\n")
+    adjunto = AdjuntoSaliente(imagen, "promo.png", "image/png", "PROMO-1")
+
+    def urlopen_que_falla(*args, **kwargs):
+        raise falla
+
+    monkeypatch.setattr(modulo.urllib.request, "urlopen", urlopen_que_falla)
+    canal = Chatwoot(url="https://chatwoot.ejemplo.com", token="t", cuenta_id=1)
+
+    with pytest.raises(esperado):
+        canal._api_archivos("conversations/12/messages", "texto", [adjunto])
+
+
 def test_los_mensajes_salen_de_a_uno_y_con_escribiendo_en_el_medio():
     """Dos globos en el mismo instante delatan al bot más que uno largo."""
     from agente.web.webhook import _enviar_con_ritmo

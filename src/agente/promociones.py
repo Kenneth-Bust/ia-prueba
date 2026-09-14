@@ -10,10 +10,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 
@@ -33,6 +32,14 @@ FIRMAS_DE_IMAGEN = {
     "image/jpeg": (b"\xff\xd8\xff",),
     "image/png": (b"\x89PNG\r\n\x1a\n",),
 }
+
+# Nicaragua usa UTC-6 todo el año: no tiene horario de verano. Se fija el
+# desfase en vez de pedir ZoneInfo("America/Managua") porque la imagen
+# python:slim puede no traer la base de zonas horarias, y el paquete tzdata
+# solo llega en Windows (lo arrastra psycopg). Sin esa base la consulta
+# fallaría en el servidor y el bot nunca mostraría una promoción vigente,
+# aunque en la computadora todo pase.
+HORA_DE_NICARAGUA = timezone(timedelta(hours=-6))
 
 
 class ErrorDeCatalogo(Exception):
@@ -54,13 +61,18 @@ class Promocion:
     imagen: AdjuntoSaliente
 
 
+def hoy_en_nicaragua() -> date:
+    """La fecha local del negocio, sin depender de la base de zonas horarias."""
+    return datetime.now(HORA_DE_NICARAGUA).date()
+
+
 def promociones_vigentes(
     ruta_catalogo: Path,
     hoy: date | None = None,
     raiz: Path = RAIZ,
 ) -> list[Promocion]:
     """Lee y valida las promociones activas para la fecha indicada."""
-    hoy = hoy or datetime.now(ZoneInfo("America/Managua")).date()
+    hoy = hoy or hoy_en_nicaragua()
     datos = _leer_json(ruta_catalogo)
     crudas = datos.get("promociones")
     if not isinstance(crudas, list):
@@ -123,19 +135,63 @@ def crear_herramienta_promociones(
             "\n\n".join(bloques),
             {
                 "adjuntos": [
-                    {
-                        "tipo": "archivo_aprobado",
-                        "ruta": str(promocion.imagen.ruta),
-                        "nombre": promocion.imagen.nombre,
-                        "mime": promocion.imagen.mime,
-                        "codigo": promocion.imagen.codigo,
-                    }
+                    artefacto_de_adjunto(promocion.imagen)
                     for promocion in promociones
                 ]
             },
         )
 
     return promociones_disponibles
+
+
+def artefacto_de_adjunto(imagen: AdjuntoSaliente) -> dict:
+    """La forma en que una herramienta entrega un archivo aprobado al agente."""
+    return {
+        "tipo": "archivo_aprobado",
+        "ruta": str(imagen.ruta),
+        "nombre": imagen.nombre,
+        "mime": imagen.mime,
+        "codigo": imagen.codigo,
+    }
+
+
+def imagen_aprobada(
+    ruta_registrada: str, codigo: str, raiz: Path = RAIZ
+) -> AdjuntoSaliente:
+    """Valida la imagen que registró un catálogo y la deja lista para enviar.
+
+    La usan todos los catálogos, no solo el de promociones: la regla de qué
+    archivo se puede mandar tiene que ser una sola.
+    """
+    relativa = Path(ruta_registrada)
+    if relativa.is_absolute():
+        raise ErrorDeCatalogo(f"{codigo}: la imagen debe usar una ruta relativa.")
+
+    raiz = raiz.resolve()
+    recursos = (raiz / "recursos").resolve()
+    ruta = (raiz / relativa).resolve()
+    if not ruta.is_relative_to(recursos):
+        raise ErrorDeCatalogo(f"{codigo}: la imagen tiene que estar dentro de recursos/.")
+    if not ruta.is_file():
+        raise ErrorDeCatalogo(f"{codigo}: no existe la imagen registrada.")
+
+    mime = MIME_POR_EXTENSION.get(ruta.suffix.lower())
+    if mime is None:
+        raise ErrorDeCatalogo(f"{codigo}: la imagen debe ser JPEG o PNG.")
+    if ruta.stat().st_size > MAXIMO_IMAGEN:
+        raise ErrorDeCatalogo(f"{codigo}: la imagen supera 5 MB.")
+    firma = ruta.read_bytes()[:8]
+    if not any(firma.startswith(prefijo) for prefijo in FIRMAS_DE_IMAGEN[mime]):
+        raise ErrorDeCatalogo(
+            f"{codigo}: el contenido de la imagen no coincide con su extensión."
+        )
+
+    return AdjuntoSaliente(
+        ruta=ruta,
+        nombre=ruta.name,
+        mime=mime,
+        codigo=codigo,
+    )
 
 
 def _leer_json(ruta: Path) -> dict:
@@ -180,7 +236,7 @@ def _convertir(cruda, raiz: Path) -> Promocion:
     ):
         raise ErrorDeCatalogo(f"{codigo}: 'incluye' necesita textos válidos.")
 
-    imagen = _imagen(cruda, codigo, raiz)
+    imagen = imagen_aprobada(_texto_obligatorio(cruda, "imagen"), codigo, raiz)
     return Promocion(
         codigo=codigo,
         titulo=_texto_obligatorio(cruda, "titulo"),
@@ -193,38 +249,6 @@ def _convertir(cruda, raiz: Path) -> Promocion:
         condicion_tarifa=_texto_obligatorio(cruda, "condicion_tarifa"),
         llamada_a_la_accion=_texto_obligatorio(cruda, "llamada_a_la_accion"),
         imagen=imagen,
-    )
-
-
-def _imagen(cruda: dict, codigo: str, raiz: Path) -> AdjuntoSaliente:
-    relativa = Path(_texto_obligatorio(cruda, "imagen"))
-    if relativa.is_absolute():
-        raise ErrorDeCatalogo(f"{codigo}: la imagen debe usar una ruta relativa.")
-
-    raiz = raiz.resolve()
-    recursos = (raiz / "recursos").resolve()
-    ruta = (raiz / relativa).resolve()
-    if not ruta.is_relative_to(recursos):
-        raise ErrorDeCatalogo(f"{codigo}: la imagen tiene que estar dentro de recursos/.")
-    if not ruta.is_file():
-        raise ErrorDeCatalogo(f"{codigo}: no existe la imagen registrada.")
-
-    mime = MIME_POR_EXTENSION.get(ruta.suffix.lower())
-    if mime is None:
-        raise ErrorDeCatalogo(f"{codigo}: la imagen debe ser JPEG o PNG.")
-    if ruta.stat().st_size > MAXIMO_IMAGEN:
-        raise ErrorDeCatalogo(f"{codigo}: la imagen supera 5 MB.")
-    firma = ruta.read_bytes()[:8]
-    if not any(firma.startswith(prefijo) for prefijo in FIRMAS_DE_IMAGEN[mime]):
-        raise ErrorDeCatalogo(
-            f"{codigo}: el contenido de la imagen no coincide con su extensión."
-        )
-
-    return AdjuntoSaliente(
-        ruta=ruta,
-        nombre=ruta.name,
-        mime=mime,
-        codigo=codigo,
     )
 
 

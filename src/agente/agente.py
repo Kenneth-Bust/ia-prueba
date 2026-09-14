@@ -158,7 +158,6 @@ class Agente:
         # La memoria: SQLite si MODO=test, Postgres si MODO=produccion.
         # Se le puede pasar otra a mano (los tests le pasan una en RAM).
         self.checkpointer = checkpointer or crear_memoria(self.config)
-        self.herramientas = herramientas_para(self.config.promociones_ruta)
 
         self.grafo = self._construir_grafo()
 
@@ -168,9 +167,10 @@ class Agente:
         """Arma el grafo: el modelo, las herramientas, y la vuelta al modelo."""
 
         # bind_tools() es lo que le avisa al modelo qué herramientas existe.
-        # Sin esto nunca las pide, por más que estén escritas.
-        herramientas = getattr(
-            self, "herramientas", herramientas_para(self.config.promociones_ruta)
+        # Sin esto nunca las pide, por más que estén escritas. Las de catálogo
+        # dependen de la configuración de cada bot.
+        herramientas = herramientas_para(
+            self.config.promociones_ruta, self.config.catalogo_ruta
         )
         modelo = self.modelo.bind_tools(herramientas)
 

@@ -104,6 +104,9 @@ class Config:
     # Catálogo opcional. Si queda vacío, el agente no recibe la herramienta
     # de promociones y conserva exactamente el comportamiento anterior.
     promociones_ruta: Path | None = None
+    # Catálogo de productos con fotos y cotizador (catalogo.py). Igual que el
+    # de promociones: vacío deja al bot sin esas herramientas.
+    catalogo_ruta: Path | None = None
 
     @classmethod
     def desde_entorno(
@@ -175,6 +178,7 @@ class Config:
             ritmo_humano=_booleano("RITMO_HUMANO", True),
             chatwoot_bandeja_id=_identificador_opcional("CHATWOOT_BANDEJA_ID"),
             promociones_ruta=_ruta_catalogo_opcional("PROMOCIONES_RUTA"),
+            catalogo_ruta=_ruta_catalogo_opcional("CATALOGO_RUTA"),
         )
 
 

@@ -318,13 +318,57 @@ registrarlo y continuar las partes locales que no dependan de él.
 - [x] Plan y guion ficticio escritos para continuidad.
 - [x] Integración de `main` hacia `piloto-demo`; 203 pruebas de referencia
   aprobadas localmente, sin llamadas a Gemini.
-- [ ] Catálogo, imágenes y cotizador implementados.
-- [ ] Envío de adjuntos y cotizaciones persistentes implementados.
+- [x] Catálogo, fotos y cotizador implementados (`src/agente/catalogo.py`,
+  `catalogos/demo_uniformes.json`, `recursos/demo_uniformes/`). Probados
+  sin proveedor y en una conversación local con Gemini.
+- [x] Envío de fotos como adjuntos de Chatwoot implementado y probado sin red.
+- [ ] Cotizaciones persistentes con código en `memoria_demo`.
 - [ ] Dos bandejas y simulador disponibles.
 - [ ] Chatwoot aislado y bloqueo de borrado verificados.
-- [ ] Despliegue demo y prueba real con Gemini completados.
+- [ ] Despliegue demo y prueba real en la bandeja API completados.
 - [ ] Validación de entrega por WhatsApp con los números nuevos, después
   de la confirmación del cliente; no forma parte de la demo API inicial.
+
+### Avance del 14/09/2026 (Claude Code)
+
+Alcance acordado con el usuario para la reunión del 15/09: el bot de la demo
+responde con fotos y precios del catálogo ficticio por la bandeja API que ya
+existe, y el portal de catálogos se muestra como diseño visual. Quedan fuera
+de esa reunión las dos bandejas, el simulador, las cotizaciones persistentes
+y el Chatwoot aislado con bloqueo de borrado.
+
+- Commit `2953c8b`: el envío de la imagen de promociones que Codex dejó sin
+  guardar, tal como estaba.
+- Arreglos sobre ese trabajo:
+  - La fecha usa UTC-6 fijo. La imagen `python:slim` puede no traer zonas
+    horarias y `tzdata` solo se instala en Windows.
+  - La foto sale aunque el modelo no escriba texto.
+  - Un envío con adjuntos que agota el tiempo no se repite, para no duplicar
+    el mensaje.
+- Catálogo nuevo:
+  - Se activa con `CATALOGO_RUTA`.
+  - Herramientas `ver_catalogo`, `mostrar_fotos` y `cotizar_pedido`.
+  - Prompt `prompts/demo_uniformes.md`. `prompts/demo.md` queda intacto porque
+    lo usan los scripts del piloto.
+- Las seis fotos son ilustraciones vectoriales pasadas a PNG. Llevan «DEMO»
+  e «Imagen ficticia de demostración»; no son fotografías.
+- Pruebas: 255 aprobadas con modelos falsos.
+- Conversación local real con `gemini-3.8-flash`, con memoria en RAM y sin
+  Chatwoot:
+  - Consultó el catálogo y adjuntó FUT-01.
+  - Cotizó 18 FUT-01 talla M con nombre y número en US$ 412.20, usando la
+    herramienta.
+  - Derivó el logo propio con la frase literal de traspaso, sin dar precio.
+- En la computadora del usuario, la librería de Gemini rechaza el
+  certificado HTTPS si no se le suman los certificados de Windows con
+  `SSL_CERT_FILE`. Es un problema local; no afecta al servidor.
+- Coolify, en lectura:
+  - `bot-demo` sigue `running:healthy` en `piloto-demo`, con
+    `PROMPT_SISTEMA=prompts/demo.md` y `MAX_TOKENS=512`.
+  - No tiene `CATALOGO_RUTA` ni variables repetidas.
+  - `settings.is_auto_deploy_enabled` es `true`, pero los dos últimos
+    despliegues (11/09) fueron manuales.
+- Al cerrar este avance no hubo push ni despliegue.
 
 **Primer paso para el siguiente agente:** comprobar el estado de Git, leer
 este documento y confirmar qué casillas siguen pendientes. No rehacer el

@@ -90,6 +90,27 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 
 ## Portal del catálogo y separación entre negocios
 
+> **Estado al 14/09/2026: propuesta, todavía sin implementar.** No existen
+> la aplicación, el dominio ni la base del portal. No lo des por hecho.
+>
+> Decisiones que tomó el usuario ese día:
+>
+> - Construirlo ya, empezando por Smarth House, y extenderlo después a los
+>   demás clientes.
+> - Una sola URL para todos los negocios.
+> - Usuarios propios del portal, no las cuentas de Chatwoot.
+> - La imagen de la promoción de Smarth House espera al portal; no se
+>   publica antes con el catálogo en archivo.
+>
+> Mientras tanto, los catálogos de demostración son JSON leídos por
+> `src/agente/catalogo.py` y `src/agente/promociones.py`. El portal cambia
+> esa fuente de datos; las herramientas y el envío de fotos por Chatwoot se
+> conservan.
+>
+> Propuesta técnica presentada, pendiente de confirmar al diseñar el portal:
+> base propia en el PostgreSQL existente con productos y fotos, y cada bot
+> leyendo solo su catálogo desde el portal con una clave propia.
+
 La opción predeterminada es una sola aplicación web para administrar todos
 los catálogos, por ejemplo `catalogos.automaticnic.online`. No se crea otro
 programa ni otra URL obligatoria por cliente. Cada persona inicia sesión y el

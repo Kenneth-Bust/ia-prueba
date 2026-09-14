@@ -32,6 +32,7 @@ from pathlib import Path
 
 from langchain_core.tools import tool
 
+from .catalogo import crear_herramientas_catalogo
 from .promociones import crear_herramienta_promociones
 
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
@@ -120,11 +121,15 @@ def clima(lugar: str) -> str:
 HERRAMIENTAS = [clima]
 
 
-def herramientas_para(ruta_promociones: Path | None = None) -> list:
-    """Herramientas comunes más las habilitadas para esta aplicación."""
+def herramientas_para(
+    ruta_promociones: Path | None = None, ruta_catalogo: Path | None = None
+) -> list:
+    """Herramientas comunes más las de catálogo habilitadas para este bot."""
     disponibles = list(HERRAMIENTAS)
     if ruta_promociones is not None:
         disponibles.append(crear_herramienta_promociones(ruta_promociones))
+    if ruta_catalogo is not None:
+        disponibles.extend(crear_herramientas_catalogo(ruta_catalogo))
     return disponibles
 
 

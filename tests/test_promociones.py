@@ -162,3 +162,21 @@ def test_el_catalogo_real_no_incluye_instalacion_ni_contrato():
     assert "instalaci" not in texto
     assert "contrato" not in texto
     assert promociones[0].imagen.ruta.is_file()
+
+
+def test_sin_fecha_explicita_usa_la_fecha_del_negocio(tmp_path):
+    """Es el camino del servidor, el único que ningún otro test recorría."""
+    catalogo = _preparar_catalogo(tmp_path, desde="2000-01-01", hasta="2100-12-31")
+
+    promociones = promociones_vigentes(catalogo, raiz=tmp_path)
+
+    assert [promocion.codigo for promocion in promociones] == ["PROMO-1"]
+
+
+def test_la_fecha_del_negocio_es_utc_menos_seis():
+    from datetime import datetime, timedelta, timezone
+
+    from agente.promociones import hoy_en_nicaragua
+
+    esperado = (datetime.now(timezone.utc) - timedelta(hours=6)).date()
+    assert hoy_en_nicaragua() == esperado

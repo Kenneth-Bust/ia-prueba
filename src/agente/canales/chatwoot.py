@@ -64,6 +64,10 @@ class ErrorDeChatwoot(Exception):
     """Chatwoot contestó algo que no esperábamos."""
 
 
+class EnvioIncierto(ErrorDeChatwoot):
+    """Se agotó la espera y no sabemos si Chatwoot creó el mensaje o no."""
+
+
 class Chatwoot(Canal):
     """La bandeja de Chatwoot: por acá entran y salen los mensajes."""
 
@@ -285,38 +289,53 @@ class Chatwoot(Canal):
         corresponda: WhatsApp, Instagram, el widget de la web.
         """
         pendientes = list(adjuntos or [])
-        for texto in mensajes:
-            if not texto.strip():
-                continue
+        textos = [texto for texto in mensajes if texto.strip()]
+        # Gemini a veces cierra una vuelta de herramienta sin escribir nada.
+        # Si ya hay fotos aprobadas, salen igual: quedarse mudo después de
+        # buscarlas es perder justo lo que la persona pidió ver.
+        if pendientes and not textos:
+            textos = [""]
 
+        for texto in textos:
             camino = f"conversations/{conversacion}/messages"
             if pendientes:
-                try:
-                    self._api_archivos(camino, texto, list(pendientes))
-                except Exception as error:
-                    # La cotización sigue siendo útil si el archivo falla. El
-                    # texto sale por el camino probado y el detalle queda en
-                    # logs; nunca se afirma desde acá que la imagen sí llegó.
-                    registro.error("No se pudo enviar un adjunto: %s", error)
-                    self._api(
-                        "POST",
-                        camino,
-                        {
-                            "content": (
-                                f"{texto}\n\n"
-                                "No pude adjuntar la imagen en este momento; "
-                                "el equipo puede compartirla directamente."
-                            ),
-                            "message_type": "outgoing",
-                        },
-                    )
-                pendientes.clear()
+                self._enviar_con_archivos(camino, texto, pendientes)
+                pendientes = []
                 continue
 
             self._api(
                 "POST",
                 camino,
                 {"content": texto, "message_type": "outgoing"},
+            )
+
+    def _enviar_con_archivos(
+        self, camino: str, texto: str, adjuntos: list[AdjuntoSaliente]
+    ) -> None:
+        """Manda el texto con sus imágenes; si Chatwoot las rechaza, solo el texto."""
+        try:
+            self._api_archivos(camino, texto, list(adjuntos))
+        except EnvioIncierto as error:
+            # Chatwoot pudo haber creado el mensaje aunque no llegó la
+            # confirmación. Reenviar a ciegas le mostraría a la persona el
+            # mismo texto dos veces: queda en logs y no se repite.
+            registro.error("Envío con adjuntos sin confirmar, no se repite: %s", error)
+        except Exception as error:
+            # La cotización sigue siendo útil si el archivo falla. El texto
+            # sale por el camino probado y el detalle queda en logs; nunca se
+            # afirma desde acá que la imagen sí llegó.
+            registro.error("No se pudo enviar un adjunto: %s", error)
+            aviso = (
+                "No pude adjuntar la imagen en este momento; "
+                "el equipo puede compartirla directamente."
+            )
+            self._api(
+                "POST",
+                camino,
+                {
+                    "content": f"{texto}\n\n{aviso}" if texto.strip() else aviso,
+                    "message_type": "outgoing",
+                },
             )
 
     def escribiendo(self, conversacion: str, encendido: bool = True) -> None:
@@ -413,6 +432,16 @@ class Chatwoot(Canal):
             raise ErrorDeChatwoot(
                 f"Chatwoot devolvió {error.code} al enviar adjuntos: {detalle}"
             ) from None
+        except (TimeoutError, urllib.error.URLError) as error:
+            # Un rechazo claro (respuesta HTTP o conexión negada) deja mandar
+            # el texto solo. Un tiempo agotado no: el POST pudo llegar y crear
+            # el mensaje, así que se informa como incierto para no duplicarlo.
+            motivo = getattr(error, "reason", error)
+            if isinstance(motivo, TimeoutError):
+                raise EnvioIncierto(
+                    f"Chatwoot no confirmó a tiempo el envío con adjuntos: {motivo}"
+                ) from None
+            raise
         return json.loads(respuesta_cruda) if respuesta_cruda else {}
 
 
