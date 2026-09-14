@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catálogos · Smarth House</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+  <link rel="stylesheet" href="/estaticos/portal.css">
+  <script src="/estaticos/portal.js" defer></script>
+</head>
+<body>
+  <div id="cargando" class="cargando">Cargando…</div>
+
+  <section id="pantalla-login" class="login" hidden>
+    <div class="login-marca">
+      <div class="marca">
+        <span id="logo-login"></span>
+        <div class="marca-nombre"><strong>Smarth House</strong><span>Catálogos</span></div>
+      </div>
+      <div>
+        <h1>Tu catálogo, el mismo que usa tu bot de WhatsApp.</h1>
+        <p>Cargás productos, servicios, promociones y los datos de tu negocio. Tu asistente responde con esa información, y solo con esa.</p>
+      </div>
+      <span class="dominio">catalogos.automaticnic.online</span>
+    </div>
+    <div class="login-lado">
+      <form id="form-login" class="login-form" novalidate>
+        <div>
+          <h2>Iniciá sesión</h2>
+          <p class="tenue">Entrá con el correo que te dio tu asesor.</p>
+        </div>
+        <label class="campo"><span>Correo</span><input id="login-correo" type="email" autocomplete="username" required></label>
+        <label class="campo"><span>Contraseña</span><input id="login-clave" type="password" autocomplete="current-password" required></label>
+        <p id="login-error" class="aviso aviso-amarillo" role="alert" hidden></p>
+        <button class="boton boton-primario boton-grande" type="submit">Entrar</button>
+        <p class="tenue">¿Olvidaste tu contraseña? Pedísela a tu asesor de Smarth House.</p>
+        <div class="aviso aviso-blanco">
+          <span id="icono-candado"></span>
+          <span>Cada negocio entra por esta misma dirección con su propia cuenta, y ve solo su información.</span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <div id="pantalla-app" class="app" hidden>
+    <aside class="lateral">
+      <div id="marca-app" class="marca"></div>
+      <div id="tarjeta-negocio" class="tarjeta-negocio"></div>
+      <nav id="nav" class="nav" aria-label="Secciones"></nav>
+      <div class="pie-lateral">
+        <div id="usuario" class="usuario"></div>
+        <button id="boton-salir" class="boton boton-texto salir" type="button">Salir</button>
+        <span class="dominio">catalogos.automaticnic.online</span>
+      </div>
+    </aside>
+    <main id="principal" class="principal"></main>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

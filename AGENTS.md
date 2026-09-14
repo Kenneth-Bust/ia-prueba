@@ -90,11 +90,17 @@ implementar. **Está ejecutado en parte:** catálogo, fotos y cotizador sí, y
 «Avance del 14/09/2026» en ese plan). El resto de las casillas sigue
 pendiente.
 
-**Próximo gran trabajo: el portal `catalogos.automaticnic.online`.** Todavía
-no existe: no hay aplicación, base ni registro DNS activo. Tiene que servir
-para **cualquier rubro**, no solo uniformes, y empieza por Smarth House. El
-modelo general, la estructura por cliente y las decisiones tomadas están en
-[la metodología](docs/metodologia-clientes.md#portal-del-catálogo-y-separación-entre-negocios).
+**Portal `catalogos.automaticnic.online`: fase 1 construida en la rama
+`portal` el 14/09, solo en local.** No está desplegado y ningún bot lo lee
+todavía. El registro DNS ya resuelve a `2.25.112.244`, el servidor de
+Coolify. Sirve para **cualquier rubro** y empieza por Smarth House.
+
+- Cómo está hecho, cómo correrlo y qué falta (fases 2 y 3):
+  [docs/portal.md](docs/portal.md).
+- El modelo general y las decisiones del usuario:
+  [la metodología](docs/metodologia-clientes.md#portal-del-catálogo-y-separación-entre-negocios).
+- El portal **no guarda números de cuenta**: el bot dice qué formas de pago
+  se aceptan y pasa a una persona todo lo demás sobre pagos.
 
 El empleado no debe borrar conversaciones completas **ni mensajes
 individuales**. El ajuste de permisos se prueba en una copia aislada de
@@ -148,6 +154,7 @@ Lo que importa acá es qué hace cada uno:
 | `../webhook_chatwoot.py` | El punto de entrada del webhook |
 | `../Dockerfile` | Empaqueta el **webhook** (`webhook_chatwoot.py`); el bot de Telegram queda adentro por si lo querés correr |
 | `web/app.py` | La plataforma de pruebas (FastAPI + un solo HTML) — **no es** el webhook |
+| `src/portal/` y `../portal_catalogos.py` | **El portal de catálogos**, una app aparte que no importa `agente` (ver `docs/portal.md`) |
 
 ---
 

@@ -90,8 +90,10 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 
 ## Portal del catálogo y separación entre negocios
 
-> **Estado al 14/09/2026: propuesta, todavía sin implementar.** No existen
-> la aplicación, el dominio ni la base del portal. No lo des por hecho.
+> **Estado al 14/09/2026: fase 1 construida en la rama `portal`, solo en
+> local** (ver [portal.md](portal.md)). No hay aplicación en Coolify ni base
+> de producción, y ningún bot lo lee todavía. El DNS `catalogos` ya apunta
+> al servidor.
 >
 > Decisiones que tomó el usuario ese día:
 >
@@ -101,6 +103,16 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 > - Usuarios propios del portal, no las cuentas de Chatwoot.
 > - La imagen de la promoción de Smarth House espera al portal; no se
 >   publica antes con el catálogo en archivo.
+> - Además del catálogo, el portal tiene **«Mi negocio»**: datos generales,
+>   dirección, horarios, formas de pago aceptadas, envíos, políticas y
+>   preguntas frecuentes. El bot la lee de lo publicado, igual que el
+>   catálogo, en vez de tenerla escrita en el prompt.
+> - **El portal no guarda números de cuenta ni imágenes con datos
+>   bancarios.** El bot puede decir qué formas de pago acepta el negocio
+>   («transferencia o efectivo»). Cuando la persona quiere pagar, pide una
+>   cuenta, manda un comprobante o pregunta si llegó un pago, el bot pasa la
+>   conversación a una persona con la frase de traspaso. Nunca confirma que
+>   un pago llegó.
 >
 > Mientras tanto, los catálogos de demostración son JSON leídos por
 > `src/agente/catalogo.py` y `src/agente/promociones.py`. El portal cambia
