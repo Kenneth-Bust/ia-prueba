@@ -32,6 +32,15 @@ Lo mínimo que tenés que saber antes de seguir leyendo:
 
 El detalle del piloto multicliente está en [docs/piloto-demo.md](docs/piloto-demo.md).
 
+### Metodología para todos los clientes
+
+Antes de crear otro cliente, catálogo o manejo de fotografías, leé
+[docs/metodologia-clientes.md](docs/metodologia-clientes.md). Ahí está la
+arquitectura que debe sobrevivir entre sesiones: código común, datos aislados
+por cliente, ramas para desarrollo, dos o más números como bandejas y la
+relación validada entre cliente, SKU, precio e imagen. No uses la memoria de
+la conversación ni el texto libre de Gemini como fuente del catálogo.
+
 ### Trabajo próximo: demo de uniformes y sublimación
 
 El usuario pidió preparar la demo en **esta rama `piloto-demo`**, con

@@ -125,6 +125,13 @@ los archivos en el repositorio porque son ficticios y reproducibles.
 
 ## 4. Arquitectura propuesta para implementar
 
+Esta demo aplica la metodología general de
+[incorporación de clientes y administración de catálogos](metodologia-clientes.md).
+El archivo y las imágenes locales descritos abajo son adecuados para datos
+ficticios. Si el prospecto contrata, el catálogo real pasa a PostgreSQL y las
+fotografías a almacenamiento persistente, sin guardar datos reales en este
+repositorio público.
+
 ### Catálogo, cotización y salida con imágenes
 
 - Catálogo versionado en `catalogos/demo_uniformes.json`; imágenes en
