@@ -32,6 +32,20 @@ Lo mínimo que tenés que saber antes de seguir leyendo:
 
 El detalle del piloto multicliente está en [docs/piloto-demo.md](docs/piloto-demo.md).
 
+### Trabajo próximo: demo de uniformes y sublimación
+
+El usuario pidió preparar la demo en **esta rama `piloto-demo`**, con
+catálogo, precios e imágenes ficticios, cotización automática y traspaso
+humano para trabajos a medida. El plan y el estado para continuar están en
+[docs/demo-uniformes-plan.md](docs/demo-uniformes-plan.md); leelo antes de
+implementar. **El plan todavía no está ejecutado.**
+
+El empleado no debe borrar conversaciones completas **ni mensajes
+individuales**. El ajuste de permisos se prueba en una copia aislada de
+Chatwoot, no en el servicio compartido con la campaña. No borres memorias
+como rutina ni cambies `main`. Coolify mostró despliegue automático activo
+también para `bot-demo`: comprobalo antes de hacer push o desplegar.
+
 ---
 
 ## Qué es esto

@@ -1,5 +1,14 @@
 # Piloto Cliente Demo
 
+**Próxima etapa, planificada el 14/09/2026:** demo de uniformes y
+sublimación en esta misma rama. El catálogo ficticio, el cotizador, las
+fotos, la presentación y el bloqueo de borrado se especifican en
+[el plan y contexto de continuidad](demo-uniformes-plan.md).
+Todavía no está implementada: el estado de abajo describe el piloto
+original. La lectura reciente de Coolify mostró despliegue automático
+activo para `bot-demo`; no asumir que quedó apagado por las instrucciones
+históricas de esta guía.
+
 Objetivo: operar una segunda marca dentro del VPS existente, con cuenta,
 credencial, instrucciones y memoria propias. No conecta números ni envía WhatsApp.
 
