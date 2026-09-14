@@ -392,8 +392,13 @@ y el Chatwoot aislado con bloqueo de borrado.
     (se descargó y es un PNG real) y el bot aclaró que es una demostración.
   - «18 de ese, talla M, con nombre y número»: desglose con US$ 22.90 por
     unidad y total US$ 412.20.
-- Detalle a pulir: la foto sale pegada al primer globo (el saludo) y no al
-  que la menciona. Funciona, pero se leería mejor en su propio mensaje.
+- La foto sale como mensaje propio, justo después del globo que la anuncia
+  (`respuesta.intercalar_adjuntos()`). Antes quedaba pegada al saludo.
+  - Commit `922dc11`, despliegue `80ah9vrn0ryelecyts6amzgs`: `finished`,
+    salud `ok` y prompt de uniformes cargado. `agente-ia` sin cambios.
+  - Prueba real en la conversación **3**: saludo, globo «Aquí te adjunto la
+    foto… FUT-02», la foto sola (PNG de 103 KB) y la pregunta para cotizar.
+  - Chatwoot acepta un mensaje con adjunto y contenido vacío.
 
 **Primer paso para el siguiente agente:** comprobar el estado de Git, leer
 este documento y confirmar qué casillas siguen pendientes. No rehacer el
