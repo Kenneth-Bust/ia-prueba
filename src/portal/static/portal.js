@@ -1185,6 +1185,7 @@ async function vistaPublicar(principal) {
     agencia_crear_negocio: () => "La agencia creó el negocio",
     agencia_crear_usuario: (d) => `La agencia creó la cuenta ${d.correo} (${d.rol})`,
     agencia_dar_acceso: (d) => `La agencia dio acceso a ${d.correo} (${d.rol})`,
+    agencia_cambiar_correo: (d) => `La agencia cambió el correo de ${d.de} a ${d.a}`,
     agencia_clave_bot: (d) => `La agencia creó una clave para el bot ${d.nombre}`,
     agencia_revocar_claves_bot: () => "La agencia anuló las claves del bot",
   };

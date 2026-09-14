@@ -94,6 +94,19 @@ def test_negocios_usuarios_y_accesos(repo, datos):
     assert repo.cliente(datos.a) == {"id": datos.a, "nombre": "Negocio A"}
     assert repo.usuario_por_correo(f"dueno-{datos.sufijo}@ejemplo.com")["id"] == datos.usuario
 
+    # Cambiar el correo conserva la cuenta (mismo id, misma contraseña) y no
+    # puede pisar el de otra persona.
+    nuevo = f"nuevo-{datos.sufijo}@ejemplo.com"
+    repo.cambiar_correo(datos.usuario, nuevo)
+    assert repo.usuario_por_correo(nuevo)["id"] == datos.usuario
+    assert repo.usuario_por_correo(f"dueno-{datos.sufijo}@ejemplo.com") is None
+    otro = repo.crear_usuario(f"otro-{datos.sufijo}@ejemplo.com", "Otra persona", "hash")
+    try:
+        with pytest.raises(YaExiste):
+            repo.cambiar_correo(datos.usuario, f"otro-{datos.sufijo}@ejemplo.com")
+    finally:
+        repo.borrar_usuario(otro)
+
     repo.dar_acceso(datos.usuario, datos.b, "empleado")
     repo.dar_acceso(datos.usuario, datos.b, "administrador")  # cambia el rol, no duplica
     assert repo.accesos(datos.usuario) == [

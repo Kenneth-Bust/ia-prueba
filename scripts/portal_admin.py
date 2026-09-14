@@ -4,6 +4,7 @@
     python scripts/portal_admin.py crear-usuario --negocio smarth-house --correo dueno@ejemplo.com --nombre "Dueño" --rol administrador
     python scripts/portal_admin.py dar-acceso --negocio uniformes --correo dueno@ejemplo.com --rol empleado
     python scripts/portal_admin.py cambiar-clave --correo dueno@ejemplo.com
+    python scripts/portal_admin.py cambiar-correo --correo viejo@ejemplo.com --nuevo nuevo@ejemplo.com
     python scripts/portal_admin.py clave-bot --negocio smarth-house --nombre agente-ia
     python scripts/portal_admin.py revocar-claves-bot --negocio smarth-house
 
@@ -64,6 +65,13 @@ def negocio_existente(repo: RepositorioPostgres, negocio: str) -> str:
 
 
 def main() -> int:
+    # La consola de Windows no siempre acepta tildes: un mensaje de éxito no
+    # puede terminar en un error después de que el cambio ya se aplicó.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
     parser = argparse.ArgumentParser(description="Administración del portal de catálogos.")
     comandos = parser.add_subparsers(dest="comando", required=True)
 
@@ -86,6 +94,10 @@ def main() -> int:
     cambiar_clave = comandos.add_parser("cambiar-clave", help="Cambia la contraseña y cierra las sesiones abiertas.")
     cambiar_clave.add_argument("--correo", required=True)
     cambiar_clave.add_argument("--generar", action="store_true")
+
+    cambiar_correo = comandos.add_parser("cambiar-correo", help="Cambia el correo con el que entra una cuenta. La contraseña queda igual.")
+    cambiar_correo.add_argument("--correo", required=True, help="El correo actual.")
+    cambiar_correo.add_argument("--nuevo", required=True, help="El correo nuevo.")
 
     clave_bot = comandos.add_parser("clave-bot", help="Crea la clave con la que un bot lee lo publicado.")
     clave_bot.add_argument("--negocio", required=True)
@@ -154,6 +166,22 @@ def ejecutar(repo: RepositorioPostgres, argumentos: argparse.Namespace) -> int:
         # abierta tampoco tiene que seguir sirviendo.
         repo.borrar_sesiones_de(usuario["id"])
         print(f"Contraseña cambiada para {correo}. Se cerraron sus sesiones abiertas.")
+
+    elif comando == "cambiar-correo":
+        viejo = validar_correo(argumentos.correo)
+        nuevo = validar_correo(argumentos.nuevo)
+        usuario = repo.usuario_por_correo(viejo)
+        if usuario is None:
+            raise SystemExit("No hay una cuenta con ese correo.")
+        try:
+            repo.cambiar_correo(usuario["id"], nuevo)
+        except YaExiste:
+            raise SystemExit("Ya hay otra cuenta con el correo nuevo. No se cambió nada.") from None
+        # Queda en la actividad de cada negocio al que accede, para que el
+        # dueño vea con qué correo se entra ahora.
+        for acceso in repo.accesos(usuario["id"]):
+            repo.auditar(acceso["cliente_id"], None, "agencia_cambiar_correo", {"de": viejo, "a": nuevo})
+        print(f"Correo cambiado: {viejo} pasa a {nuevo}. La contraseña es la misma.")
 
     elif comando == "clave-bot":
         negocio = negocio_existente(repo, argumentos.negocio)

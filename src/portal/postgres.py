@@ -233,6 +233,12 @@ class RepositorioPostgres:
     def borrar_usuario(self, usuario_id: int) -> None:
         self._ejecutar("DELETE FROM usuarios WHERE id = %s", (usuario_id,))
 
+    def cambiar_correo(self, usuario_id: int, correo: str) -> None:
+        try:
+            self._ejecutar("UPDATE usuarios SET correo = %s WHERE id = %s", (correo, usuario_id))
+        except psycopg.errors.UniqueViolation:
+            raise YaExiste(correo) from None
+
     def cambiar_clave(self, usuario_id: int, clave_hash: str) -> None:
         self._ejecutar("UPDATE usuarios SET clave_hash = %s WHERE id = %s", (clave_hash, usuario_id))
 
