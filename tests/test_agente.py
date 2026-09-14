@@ -15,7 +15,8 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from agente.agente import Agente  # noqa: E402
+from agente.agente import Agente, _adjuntos_del_turno  # noqa: E402
+from agente.canales.base import AdjuntoSaliente  # noqa: E402
 from agente.config import RAIZ, Config, ErrorDeConfiguracion  # noqa: E402
 from agente.memoria import ram  # noqa: E402
 from agente.prompts import leer_prompt  # noqa: E402
@@ -56,6 +57,59 @@ def agente_falso(respuestas: list[str], memoria_mensajes: int = 20) -> Agente:
 def test_responde():
     a = agente_falso(["Hola"])
     assert a.responder("hola").texto == "Hola"
+
+
+def test_solo_recoge_adjuntos_del_turno_actual(tmp_path):
+    anterior = ToolMessage(
+        "resultado anterior",
+        tool_call_id="anterior",
+        artifact={
+            "adjuntos": [
+                {
+                    "tipo": "archivo_aprobado",
+                    "ruta": str(tmp_path / "anterior.png"),
+                    "nombre": "anterior.png",
+                    "mime": "image/png",
+                    "codigo": "ANTERIOR",
+                }
+            ]
+        },
+    )
+    actual = ToolMessage(
+        "resultado actual",
+        tool_call_id="actual",
+        artifact={
+            "adjuntos": [
+                {
+                    "tipo": "archivo_aprobado",
+                    "ruta": str(tmp_path / "actual.png"),
+                    "nombre": "actual.png",
+                    "mime": "image/png",
+                    "codigo": "ACTUAL",
+                }
+            ]
+        },
+    )
+
+    adjuntos = _adjuntos_del_turno(
+        [
+            HumanMessage("antes"),
+            anterior,
+            AIMessage("listo"),
+            HumanMessage("ahora"),
+            actual,
+            AIMessage("listo"),
+        ]
+    )
+
+    assert adjuntos == (
+        AdjuntoSaliente(
+            ruta=tmp_path / "actual.png",
+            nombre="actual.png",
+            mime="image/png",
+            codigo="ACTUAL",
+        ),
+    )
 
 
 def test_se_acuerda_de_la_conversacion():

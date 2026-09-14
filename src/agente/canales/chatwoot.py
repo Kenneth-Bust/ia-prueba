@@ -30,11 +30,16 @@ La API de Chatwoot son pedidos HTTP con JSON: no hace falta más.
 from __future__ import annotations
 
 import json
+import logging
 import urllib.error
 import urllib.request
 from collections import deque
+from pathlib import Path
+from uuid import uuid4
 
-from .base import Adjunto, Canal, MensajeEntrante
+from .base import Adjunto, AdjuntoSaliente, Canal, MensajeEntrante
+
+registro = logging.getLogger("agente.chatwoot")
 
 # Cuánto esperamos a que Chatwoot conteste. Corre en el mismo servidor que
 # el agente, así que si tarda más que esto es porque algo anda mal.
@@ -46,6 +51,8 @@ ESPERA_DE_DESCARGA = 60
 # Tope de tamaño por archivo. No es un límite del modelo: es para que una
 # persona que manda un video de 80 MB no deje sin memoria al contenedor.
 MAXIMO_DE_ADJUNTO = 15 * 1024 * 1024
+MAXIMO_DE_ADJUNTO_SALIENTE = 5 * 1024 * 1024
+MIMES_DE_IMAGEN_SALIENTE = {"image/jpeg", "image/png"}
 
 # Qué adjuntos vale la pena mandarle al modelo. Los que no están acá se
 # descartan en silencio: un .zip no aporta nada a la conversación y encima
@@ -265,20 +272,50 @@ class Chatwoot(Canal):
 
     # -- Salida ----------------------------------------------------------------
 
-    def enviar(self, conversacion: str, mensajes: list[str]) -> None:
+    def enviar(
+        self,
+        conversacion: str,
+        mensajes: list[str],
+        adjuntos: list[AdjuntoSaliente] | tuple[AdjuntoSaliente, ...] | None = None,
+    ) -> None:
         """Manda las respuestas a esa conversación, en orden.
 
         Salen como `outgoing`, que es lo que Chatwoot entiende por "esto lo
         dice nuestro lado". Desde ahí Chatwoot lo empuja al canal que
         corresponda: WhatsApp, Instagram, el widget de la web.
         """
+        pendientes = list(adjuntos or [])
         for texto in mensajes:
             if not texto.strip():
                 continue
 
+            camino = f"conversations/{conversacion}/messages"
+            if pendientes:
+                try:
+                    self._api_archivos(camino, texto, list(pendientes))
+                except Exception as error:
+                    # La cotización sigue siendo útil si el archivo falla. El
+                    # texto sale por el camino probado y el detalle queda en
+                    # logs; nunca se afirma desde acá que la imagen sí llegó.
+                    registro.error("No se pudo enviar un adjunto: %s", error)
+                    self._api(
+                        "POST",
+                        camino,
+                        {
+                            "content": (
+                                f"{texto}\n\n"
+                                "No pude adjuntar la imagen en este momento; "
+                                "el equipo puede compartirla directamente."
+                            ),
+                            "message_type": "outgoing",
+                        },
+                    )
+                pendientes.clear()
+                continue
+
             self._api(
                 "POST",
-                f"conversations/{conversacion}/messages",
+                camino,
                 {"content": texto, "message_type": "outgoing"},
             )
 
@@ -333,6 +370,51 @@ class Chatwoot(Canal):
 
         return json.loads(cuerpo) if cuerpo else {}
 
+    def _api_archivos(
+        self, camino: str, texto: str, adjuntos: list[AdjuntoSaliente]
+    ) -> dict:
+        """Crea un mensaje multipart con texto e imágenes de catálogo."""
+        archivos: list[tuple[str, str, bytes]] = []
+        for adjunto in adjuntos:
+            ruta = adjunto.ruta.resolve()
+            if not ruta.is_file():
+                raise ErrorDeChatwoot(f"No existe el adjunto '{adjunto.codigo}'.")
+            if adjunto.mime not in MIMES_DE_IMAGEN_SALIENTE:
+                raise ErrorDeChatwoot("Solo se pueden enviar imágenes JPEG o PNG.")
+            contenido = ruta.read_bytes()
+            if len(contenido) > MAXIMO_DE_ADJUNTO_SALIENTE:
+                raise ErrorDeChatwoot("Una imagen saliente supera 5 MB.")
+            nombre = (
+                Path(adjunto.nombre)
+                .name.replace('"', "")
+                .replace("\r", "")
+                .replace("\n", "")
+            )
+            archivos.append((nombre or ruta.name, adjunto.mime, contenido))
+
+        limite, cuerpo = _multipart(
+            {"content": texto, "message_type": "outgoing"}, archivos
+        )
+        url = f"{self.url}/api/v1/accounts/{self.cuenta_id}/{camino}"
+        pedido = urllib.request.Request(
+            url,
+            data=cuerpo,
+            method="POST",
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={limite}",
+                "api_access_token": self.token,
+            },
+        )
+        try:
+            with urllib.request.urlopen(pedido, timeout=ESPERA_DE_RED) as respuesta:
+                respuesta_cruda = respuesta.read().decode("utf-8")
+        except urllib.error.HTTPError as error:
+            detalle = error.read().decode("utf-8", "replace")[:300]
+            raise ErrorDeChatwoot(
+                f"Chatwoot devolvió {error.code} al enviar adjuntos: {detalle}"
+            ) from None
+        return json.loads(respuesta_cruda) if respuesta_cruda else {}
+
 
 # -- Ayudantes ----------------------------------------------------------------
 
@@ -345,6 +427,43 @@ def _identificador(valor) -> str:
     if not texto.isascii() or not texto.isdecimal() or int(texto) <= 0:
         return ""
     return str(int(texto))
+
+
+def _multipart(
+    campos: dict[str, str], archivos: list[tuple[str, str, bytes]]
+) -> tuple[str, bytes]:
+    """Codifica el formulario que espera ``attachments[]`` en Chatwoot."""
+    limite = f"----agente-{uuid4().hex}"
+    partes: list[bytes] = []
+
+    for nombre, valor in campos.items():
+        partes.extend(
+            [
+                f"--{limite}\r\n".encode("ascii"),
+                (
+                    f'Content-Disposition: form-data; name="{nombre}"\r\n\r\n'
+                ).encode("ascii"),
+                str(valor).encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+
+    for nombre, mime, contenido in archivos:
+        partes.extend(
+            [
+                f"--{limite}\r\n".encode("ascii"),
+                (
+                    'Content-Disposition: form-data; name="attachments[]"; '
+                    f'filename="{nombre}"\r\n'
+                ).encode("utf-8"),
+                f"Content-Type: {mime}\r\n\r\n".encode("ascii"),
+                contenido,
+                b"\r\n",
+            ]
+        )
+
+    partes.append(f"--{limite}--\r\n".encode("ascii"))
+    return limite, b"".join(partes)
 
 
 def _adjuntos_de(evento: dict) -> list[Adjunto]:

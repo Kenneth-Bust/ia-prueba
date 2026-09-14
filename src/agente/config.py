@@ -101,6 +101,9 @@ class Config:
     # Vacío conserva todas las bandejas de la cuenta actual. Cada bot de un
     # cliente lleva un ID explícito para no atender otra bandeja por error.
     chatwoot_bandeja_id: str = ""
+    # Catálogo opcional. Si queda vacío, el agente no recibe la herramienta
+    # de promociones y conserva exactamente el comportamiento anterior.
+    promociones_ruta: Path | None = None
 
     @classmethod
     def desde_entorno(
@@ -171,6 +174,7 @@ class Config:
             respuesta_minima_segundos=respuesta_minima,
             ritmo_humano=_booleano("RITMO_HUMANO", True),
             chatwoot_bandeja_id=_identificador_opcional("CHATWOOT_BANDEJA_ID"),
+            promociones_ruta=_ruta_catalogo_opcional("PROMOCIONES_RUTA"),
         )
 
 
@@ -274,6 +278,20 @@ def _identificador_opcional(nombre: str) -> str:
     if valor and (not valor.isascii() or not valor.isdecimal() or int(valor) <= 0):
         raise ErrorDeConfiguracion(f"{nombre} tiene que ser un ID positivo o quedar vacío.")
     return str(int(valor)) if valor else ""
+
+
+def _ruta_catalogo_opcional(nombre: str) -> Path | None:
+    valor = (os.getenv(nombre) or "").strip()
+    if not valor:
+        return None
+    relativa = Path(valor)
+    if relativa.is_absolute():
+        raise ErrorDeConfiguracion(f"{nombre} debe ser una ruta relativa dentro de catalogos/.")
+    ruta = (RAIZ / relativa).resolve()
+    catalogos = (RAIZ / "catalogos").resolve()
+    if not ruta.is_relative_to(catalogos) or ruta.suffix.lower() != ".json":
+        raise ErrorDeConfiguracion(f"{nombre} debe apuntar a un JSON dentro de catalogos/.")
+    return ruta
 
 
 @dataclass

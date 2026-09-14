@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -48,6 +49,16 @@ class Adjunto:
         return self.tipo == "audio"
 
 
+@dataclass(frozen=True)
+class AdjuntoSaliente:
+    """Un archivo aprobado que el servidor puede enviar por un canal."""
+
+    ruta: Path
+    nombre: str
+    mime: str
+    codigo: str = ""
+
+
 @dataclass
 class MensajeEntrante:
     """Un mensaje que llega de afuera, ya traducido a algo que el agente entiende."""
@@ -66,7 +77,12 @@ class Canal(ABC):
     nombre: str = "sin nombre"
 
     @abstractmethod
-    def enviar(self, conversacion: str, mensajes: list[str]) -> None:
+    def enviar(
+        self,
+        conversacion: str,
+        mensajes: list[str],
+        adjuntos: list[AdjuntoSaliente] | tuple[AdjuntoSaliente, ...] | None = None,
+    ) -> None:
         """Manda una o varias respuestas a esa conversación.
 
         Es una lista y no un texto porque en mensajería conviene partir las

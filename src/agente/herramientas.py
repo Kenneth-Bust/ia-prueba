@@ -28,8 +28,11 @@ from __future__ import annotations
 import json
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 from langchain_core.tools import tool
+
+from .promociones import crear_herramienta_promociones
 
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
 PRONOSTICO = "https://api.open-meteo.com/v1/forecast"
@@ -115,6 +118,14 @@ def clima(lugar: str) -> str:
 # Lo que el agente tiene atado. Cuando agregues otra herramienta, sumala acá:
 # es la única lista que mira el grafo.
 HERRAMIENTAS = [clima]
+
+
+def herramientas_para(ruta_promociones: Path | None = None) -> list:
+    """Herramientas comunes más las habilitadas para esta aplicación."""
+    disponibles = list(HERRAMIENTAS)
+    if ruta_promociones is not None:
+        disponibles.append(crear_herramienta_promociones(ruta_promociones))
+    return disponibles
 
 
 # -- Las consultas ------------------------------------------------------------

@@ -133,7 +133,7 @@ class Telegram(Canal):
 
     # -- Salida ----------------------------------------------------------------
 
-    def enviar(self, conversacion: str, mensajes: list[str]) -> None:
+    def enviar(self, conversacion: str, mensajes: list[str], adjuntos=None) -> None:
         """Manda las respuestas a ese chat, en orden."""
         for mensaje in mensajes:
             # Un mensaje más largo que el tope lo rechaza Telegram entero, así

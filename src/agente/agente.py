@@ -28,14 +28,16 @@ import base64
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from .canales.base import AdjuntoSaliente
 from .config import Config
-from .herramientas import HERRAMIENTAS
+from .herramientas import herramientas_para
 from .memoria import crear_memoria
 from .modelos import crear_modelo
 from .prompts import leer_prompt
@@ -86,6 +88,15 @@ class Respuesta:
     # se guardaron en el caché para la próxima.
     tokens_cache_leidos: int = 0
     tokens_cache_guardados: int = 0
+    adjuntos: tuple[AdjuntoSaliente, ...] = ()
+
+
+@dataclass
+class RespuestaPartida:
+    """Texto listo para mensajería junto con sus archivos aprobados."""
+
+    mensajes: list[str]
+    adjuntos: tuple[AdjuntoSaliente, ...] = ()
 
 
 class Transmision:
@@ -147,6 +158,7 @@ class Agente:
         # La memoria: SQLite si MODO=test, Postgres si MODO=produccion.
         # Se le puede pasar otra a mano (los tests le pasan una en RAM).
         self.checkpointer = checkpointer or crear_memoria(self.config)
+        self.herramientas = herramientas_para(self.config.promociones_ruta)
 
         self.grafo = self._construir_grafo()
 
@@ -157,7 +169,10 @@ class Agente:
 
         # bind_tools() es lo que le avisa al modelo qué herramientas existe.
         # Sin esto nunca las pide, por más que estén escritas.
-        modelo = self.modelo.bind_tools(HERRAMIENTAS)
+        herramientas = getattr(
+            self, "herramientas", herramientas_para(self.config.promociones_ruta)
+        )
+        modelo = self.modelo.bind_tools(herramientas)
 
         def nodo_modelo(estado: MessagesState) -> dict:
             respuesta = modelo.invoke(self._armar_entrada(estado))
@@ -165,7 +180,7 @@ class Agente:
 
         grafo = StateGraph(MessagesState)
         grafo.add_node("modelo", nodo_modelo)
-        grafo.add_node("herramientas", ToolNode(HERRAMIENTAS))
+        grafo.add_node("herramientas", ToolNode(herramientas))
         grafo.add_edge(START, "modelo")
 
         # tools_condition mira la respuesta del modelo: si pidió herramientas
@@ -244,7 +259,11 @@ class Agente:
         entrada = _mensaje_humano(texto, archivos)
 
         salida = self._invocar_con_reintentos(entrada, conversacion)
-        return _a_respuesta(salida["messages"][-1], self.config.modelo)
+        return _a_respuesta(
+            salida["messages"][-1],
+            self.config.modelo,
+            adjuntos=_adjuntos_del_turno(salida["messages"]),
+        )
 
     def _invocar_con_reintentos(self, entrada, conversacion: str) -> dict:
         """Llama al grafo y reintenta si el proveedor está sobrecargado.
@@ -344,6 +363,19 @@ class Agente:
         """
         return partir_respuesta(
             self.responder(texto, conversacion, archivos).texto
+        )
+
+    def responder_partido_con_adjuntos(
+        self,
+        texto: str,
+        conversacion: str = "local",
+        archivos: list[tuple[bytes, str]] | None = None,
+    ) -> RespuestaPartida:
+        """Respuesta para mensajería sin perder los adjuntos de herramientas."""
+        respuesta = self.responder(texto, conversacion, archivos)
+        return RespuestaPartida(
+            mensajes=partir_respuesta(respuesta.texto),
+            adjuntos=respuesta.adjuntos,
         )
 
     def historial(self, conversacion: str = "local") -> list:
@@ -506,7 +538,45 @@ def _texto_de(mensaje) -> str:
     return ""
 
 
-def _a_respuesta(mensaje, modelo_por_defecto: str) -> Respuesta:
+def _adjuntos_del_turno(mensajes: list) -> tuple[AdjuntoSaliente, ...]:
+    """Obtiene solo los adjuntos producidos desde el último mensaje humano."""
+    encontrados: list[AdjuntoSaliente] = []
+    vistos: set[tuple[str, str]] = set()
+
+    for mensaje in reversed(mensajes):
+        if isinstance(mensaje, HumanMessage):
+            break
+        if not isinstance(mensaje, ToolMessage):
+            continue
+        artefacto = getattr(mensaje, "artifact", None)
+        if not isinstance(artefacto, dict):
+            continue
+        for adjunto in artefacto.get("adjuntos") or []:
+            if not isinstance(adjunto, dict) or adjunto.get("tipo") != "archivo_aprobado":
+                continue
+            try:
+                aprobado = AdjuntoSaliente(
+                    ruta=Path(adjunto["ruta"]),
+                    nombre=str(adjunto["nombre"]),
+                    mime=str(adjunto["mime"]),
+                    codigo=str(adjunto.get("codigo") or ""),
+                )
+            except (KeyError, TypeError):
+                continue
+            clave = (str(aprobado.ruta), aprobado.codigo)
+            if clave not in vistos:
+                encontrados.append(aprobado)
+                vistos.add(clave)
+
+    encontrados.reverse()
+    return tuple(encontrados)
+
+
+def _a_respuesta(
+    mensaje,
+    modelo_por_defecto: str,
+    adjuntos: tuple[AdjuntoSaliente, ...] = (),
+) -> Respuesta:
     """Convierte la respuesta de LangChain en algo simple de usar."""
     if mensaje is None:
         return Respuesta(texto="", modelo=modelo_por_defecto)
@@ -526,4 +596,5 @@ def _a_respuesta(mensaje, modelo_por_defecto: str) -> Respuesta:
         tokens_salida=uso.get("output_tokens", 0),
         tokens_cache_leidos=detalle.get("cache_read", 0),
         tokens_cache_guardados=detalle.get("cache_creation", 0),
+        adjuntos=adjuntos,
     )

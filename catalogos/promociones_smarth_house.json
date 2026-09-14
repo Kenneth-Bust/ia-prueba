@@ -1,0 +1,24 @@
+{
+  "version": "2026-09-14",
+  "promociones": [
+    {
+      "codigo": "SH-PROMO-45-2026",
+      "titulo": "Automatización de WhatsApp con CRM incluido",
+      "precio_mensual": "45",
+      "moneda": "USD",
+      "limite_conversaciones": 1000,
+      "incluye": [
+        "panel CRM",
+        "app para revisar y responder desde el celular",
+        "soporte",
+        "capacitación"
+      ],
+      "vigente_desde": "2026-09-01",
+      "vigente_hasta": "2026-10-11",
+      "condicion_tarifa": "Quienes contraten dentro de la vigencia conservan US$ 45 mensuales en el plan de hasta 1.000 conversaciones",
+      "llamada_a_la_accion": "coordinar una videollamada para mostrar la demo",
+      "imagen": "recursos/promociones/smarth-house/promo-45-hasta-2026-10-11.png",
+      "activa": true
+    }
+  ]
+}

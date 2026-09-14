@@ -23,7 +23,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from agente.canales.buffer import BufferDeMensajes  # noqa: E402
-from agente.canales.chatwoot import Chatwoot, _tipo_de_mensaje  # noqa: E402
+from agente.canales.base import AdjuntoSaliente  # noqa: E402
+from agente.canales.chatwoot import Chatwoot, _multipart, _tipo_de_mensaje  # noqa: E402
 
 
 def evento(
@@ -580,6 +581,79 @@ def test_el_buffer_suelta_la_foto_sola():
     asyncio.run(correr())
 
     assert sueltos == [("12", "", 1)]
+
+
+def test_el_multipart_incluye_texto_y_archivo():
+    limite, cuerpo = _multipart(
+        {"content": "Esta es la promoción", "message_type": "outgoing"},
+        [("promo.png", "image/png", b"imagen-binaria")],
+    )
+
+    assert limite.encode("ascii") in cuerpo
+    assert b'name="content"' in cuerpo
+    assert "Esta es la promoción".encode() in cuerpo
+    assert b'name="attachments[]"; filename="promo.png"' in cuerpo
+    assert b"Content-Type: image/png" in cuerpo
+    assert b"imagen-binaria" in cuerpo
+
+
+def test_chatwoot_envia_el_adjunto_solo_con_el_primer_texto(tmp_path):
+    imagen = tmp_path / "promo.png"
+    imagen.write_bytes(b"\x89PNG\r\n\x1a\n")
+    adjunto = AdjuntoSaliente(imagen, "promo.png", "image/png", "PROMO-1")
+    canal = ChatwootFalso()
+    envios_con_archivo = []
+    canal._api_archivos = lambda camino, texto, adjuntos: envios_con_archivo.append(
+        (camino, texto, adjuntos)
+    )
+
+    canal.enviar("12", ["primero", "segundo"], [adjunto])
+
+    assert envios_con_archivo == [
+        ("conversations/12/messages", "primero", [adjunto])
+    ]
+    assert canal.envios() == ["segundo"]
+
+
+def test_si_falla_la_imagen_chatwoot_avisa_y_conserva_el_texto(tmp_path):
+    adjunto = AdjuntoSaliente(
+        tmp_path / "ausente.png", "ausente.png", "image/png", "PROMO-1"
+    )
+    canal = ChatwootFalso()
+
+    def fallar(*args):
+        raise RuntimeError("fallo de prueba")
+
+    canal._api_archivos = fallar
+    canal.enviar("12", ["La promoción cuesta US$ 45."], [adjunto])
+
+    assert "US$ 45" in canal.envios()[0]
+    assert "No pude adjuntar la imagen" in canal.envios()[0]
+
+
+def test_el_webhook_pasa_adjuntos_solo_en_el_primer_globo(tmp_path):
+    from agente.web.webhook import _enviar_con_ritmo
+
+    adjunto = AdjuntoSaliente(
+        tmp_path / "promo.png", "promo.png", "image/png", "PROMO-1"
+    )
+    canal = ChatwootFalso()
+    llamadas = []
+    canal.enviar = lambda conversacion, mensajes, adjuntos=None: llamadas.append(
+        (mensajes[0], adjuntos)
+    )
+
+    asyncio.run(
+        _enviar_con_ritmo(
+            canal,
+            "12",
+            ["primero", "segundo"],
+            ritmo=False,
+            adjuntos=[adjunto],
+        )
+    )
+
+    assert llamadas == [("primero", [adjunto]), ("segundo", None)]
 
 
 def test_los_mensajes_salen_de_a_uno_y_con_escribiendo_en_el_medio():

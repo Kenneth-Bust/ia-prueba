@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .agente import Agente, Respuesta, Transmision
-from .canales import Canal, MensajeEntrante
+from .agente import Agente, Respuesta, RespuestaPartida, Transmision
+from .canales import AdjuntoSaliente, Canal, MensajeEntrante
 from .config import Config, ErrorDeConfiguracion, proveedores_disponibles
 from .modelos import crear_modelo
 from .respuesta import partir_respuesta
@@ -12,11 +12,13 @@ __version__ = "1.0.0"
 
 __all__ = [
     "Agente",
+    "AdjuntoSaliente",
     "Canal",
     "Config",
     "ErrorDeConfiguracion",
     "MensajeEntrante",
     "Respuesta",
+    "RespuestaPartida",
     "Transmision",
     "crear_modelo",
     "partir_respuesta",

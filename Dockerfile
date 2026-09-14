@@ -43,6 +43,8 @@ RUN pip install --no-cache-dir -r requirements-produccion.txt
 
 COPY src/ ./src/
 COPY prompts/ ./prompts/
+COPY catalogos/ ./catalogos/
+COPY recursos/ ./recursos/
 COPY webhook_chatwoot.py bot_telegram.py ./
 
 # Sin esto corre como root sin necesidad: el servidor no escribe nada en

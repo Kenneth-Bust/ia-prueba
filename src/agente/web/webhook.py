@@ -105,9 +105,14 @@ def crear_app(
             )
 
             try:
-                mensajes = await asyncio.to_thread(
-                    agente.responder_partido, texto, conversacion, archivos
+                salida = await asyncio.to_thread(
+                    agente.responder_partido_con_adjuntos,
+                    texto,
+                    conversacion,
+                    archivos,
                 )
+                mensajes = salida.mensajes
+                adjuntos_salida = salida.adjuntos
             except Exception as e:
                 # El detalle del error va al log, donde lo puede leer quien
                 # mantiene esto. A la persona que está del otro lado no: un
@@ -121,6 +126,7 @@ def crear_app(
                     "Perdón, se me complicó la conexión y no pude procesar tu "
                     "mensaje. ¿Me lo repetís?"
                 ]
+                adjuntos_salida = ()
 
             try:
                 if not cerrando:
@@ -130,7 +136,11 @@ def crear_app(
                         recibido_en + config.respuesta_minima_segundos
                     )
                 await _enviar_con_ritmo(
-                    canal, conversacion, mensajes, config.ritmo_humano
+                    canal,
+                    conversacion,
+                    mensajes,
+                    config.ritmo_humano,
+                    adjuntos=adjuntos_salida,
                 )
             except Exception as e:
                 # Acá ya no hay a quién avisarle: el canal de salida es
@@ -233,6 +243,7 @@ async def _enviar_con_ritmo(
     conversacion: str,
     mensajes: list[str],
     ritmo: bool = True,
+    adjuntos=None,
 ) -> None:
     """Manda los mensajes uno por uno, con el tiempo de escribirlos en el medio.
 
@@ -247,7 +258,10 @@ async def _enviar_con_ritmo(
     Con un solo mensaje esto no hace nada, que es el caso más común.
     """
     for i, texto in enumerate(mensajes):
-        await asyncio.to_thread(canal.enviar, conversacion, [texto])
+        if i == 0 and adjuntos:
+            await asyncio.to_thread(canal.enviar, conversacion, [texto], adjuntos)
+        else:
+            await asyncio.to_thread(canal.enviar, conversacion, [texto])
 
         siguiente = mensajes[i + 1] if i + 1 < len(mensajes) else None
         if siguiente is None or not ritmo:

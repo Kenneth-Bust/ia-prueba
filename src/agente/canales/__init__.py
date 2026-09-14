@@ -10,6 +10,6 @@ lo usa.
 
 from __future__ import annotations
 
-from .base import Canal, MensajeEntrante
+from .base import AdjuntoSaliente, Canal, MensajeEntrante
 
-__all__ = ["Canal", "MensajeEntrante"]
+__all__ = ["AdjuntoSaliente", "Canal", "MensajeEntrante"]
