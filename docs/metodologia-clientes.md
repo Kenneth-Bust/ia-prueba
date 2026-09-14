@@ -107,9 +107,51 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 > esa fuente de datos; las herramientas y el envío de fotos por Chatwoot se
 > conservan.
 >
-> Propuesta técnica presentada, pendiente de confirmar al diseñar el portal:
-> base propia en el PostgreSQL existente con productos y fotos, y cada bot
-> leyendo solo su catálogo desde el portal con una clave propia.
+> Estructura confirmada por el usuario el 14/09, la misma que planteó Codex:
+>
+> - Cada cliente conserva su aplicación en Coolify, su prompt y
+>   configuración, su cuenta de Chatwoot (con una o varias bandejas) y su
+>   base de memoria.
+> - El portal es la única pieza compartida. Guarda los datos del catálogo en
+>   PostgreSQL y las fotos en almacenamiento de archivos: primero un volumen
+>   dedicado del portal, después uno compatible con S3.
+> - Cada bot lee solo el catálogo **publicado** de su cliente.
+> - Hay un diseño visual aprobado de cinco pantallas: inicio de sesión,
+>   catálogo, editar producto, descuentos y vista de empleado. Es un
+>   artifact privado del usuario: pedile el enlace.
+
+### Un mismo portal para cualquier rubro
+
+El portal no se diseña para uniformes. Smarth House vende un servicio
+mensual con promoción; una ferretería vende productos por unidad; un
+restaurante, platos con adicionales; un salón, servicios. El modelo es
+general y cada negocio usa solo lo que necesita:
+
+| Pieza | Para qué sirve | Ejemplos |
+|---|---|---|
+| Tipo de ítem | Producto, servicio o promoción | Uniforme, plan mensual, corte de cabello |
+| Precio y unidad | Qué se cobra y por qué | US$ 22 por unidad, US$ 45 al mes, C$ 250 por plato |
+| Vigencia | Fechas opcionales de inicio y fin | Promoción hasta el 11/10/2026 |
+| Opciones | Listas que define cada negocio, sin recargo | Talla, color, sabor, tamaño |
+| Extras | Adicionales con precio | Nombre estampado, queso extra |
+| Reglas de precio | Opcionales, como descuentos por cantidad | 5 % desde 12 unidades |
+| Cotización automática | Si el bot calcula o pasa el pedido a una persona | Diseño con logo: persona |
+| Fotos | Cero, una o varias por ítem | Foto del producto o pieza de la promoción |
+
+Reglas para quien lo implemente:
+
+- No crear columnas ni pantallas propias de un rubro. «Tallas» es una opción
+  llamada Talla, no un campo fijo. El diseño aprobado muestra «Tallas y
+  extras» porque usa los datos de la demo; al construirlo, esa sección es
+  «Opciones y extras».
+- Las herramientas del bot (`ver_catalogo`, `mostrar_fotos`,
+  `cotizar_pedido`) leen ese mismo modelo. El JSON de la demo usa `tallas`
+  como caso particular; al pasar al portal se migra a `opciones` sin
+  cambiar lo que ve el cliente.
+- Las promociones con vigencia de `promociones.py` se integran como un tipo
+  de ítem más, no como un sistema aparte.
+- El cotizador aplica solo las reglas que el negocio activó. Lo que no tiene
+  una regla va a una persona: nunca se inventa un precio.
 
 La opción predeterminada es una sola aplicación web para administrar todos
 los catálogos, por ejemplo `catalogos.automaticnic.online`. No se crea otro

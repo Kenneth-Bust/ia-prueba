@@ -42,7 +42,7 @@ from ..canales.buffer import BufferDeMensajes
 from ..canales.chatwoot import Chatwoot
 from ..config import Config
 from ..prompts import leer_prompt
-from ..respuesta import pausa_de_tipeo
+from ..respuesta import intercalar_adjuntos, pausa_de_tipeo
 
 registro = logging.getLogger("agente.webhook")
 
@@ -256,27 +256,28 @@ async def _enviar_con_ritmo(
     que tardaría alguien en tipear el que viene, y recién ahí sale.
 
     Con un solo mensaje esto no hace nada, que es el caso más común.
-    """
-    # Sin texto pero con fotos aprobadas igual hay algo que entregar. El
-    # canal decide cómo se manda un mensaje que es solo la imagen.
-    if adjuntos and not mensajes:
-        mensajes = [""]
 
-    for i, texto in enumerate(mensajes):
-        if i == 0 and adjuntos:
-            await asyncio.to_thread(canal.enviar, conversacion, [texto], adjuntos)
+    Las fotos aprobadas salen como un mensaje propio, después del globo que
+    las anuncia: ver respuesta.intercalar_adjuntos(). Sin texto, igual salen.
+    """
+    envios = intercalar_adjuntos(mensajes, adjuntos)
+
+    for i, (texto, fotos) in enumerate(envios):
+        if fotos:
+            await asyncio.to_thread(canal.enviar, conversacion, [], list(fotos))
         else:
             await asyncio.to_thread(canal.enviar, conversacion, [texto])
 
-        siguiente = mensajes[i + 1] if i + 1 < len(mensajes) else None
+        siguiente = envios[i + 1] if i + 1 < len(envios) else None
         if siguiente is None or not ritmo:
             continue
 
         # El "escribiendo..." tiene que estar prendido DURANTE la pausa, no
         # antes de mandar: es lo que hace que la espera se lea como alguien
-        # tecleando y no como que el bot se colgó.
+        # tecleando y no como que el bot se colgó. Una foto no se tipea: con
+        # texto vacío toma la pausa mínima.
         await asyncio.to_thread(canal.escribiendo, conversacion, True)
-        await asyncio.sleep(pausa_de_tipeo(siguiente))
+        await asyncio.sleep(pausa_de_tipeo(siguiente[0]))
 
 
 def _bajar(canal: Chatwoot, conversacion: str, adjuntos: list) -> list:

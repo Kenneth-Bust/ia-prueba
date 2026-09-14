@@ -631,7 +631,8 @@ def test_si_falla_la_imagen_chatwoot_avisa_y_conserva_el_texto(tmp_path):
     assert "No pude adjuntar la imagen" in canal.envios()[0]
 
 
-def test_el_webhook_pasa_adjuntos_solo_en_el_primer_globo(tmp_path):
+def test_el_webhook_manda_la_foto_sola_despues_del_globo_que_la_anuncia(tmp_path):
+    """Pegada al saludo quedaba como epígrafe de «¡Hola!» y se leía fuera de lugar."""
     from agente.web.webhook import _enviar_con_ritmo
 
     adjunto = AdjuntoSaliente(
@@ -640,20 +641,25 @@ def test_el_webhook_pasa_adjuntos_solo_en_el_primer_globo(tmp_path):
     canal = ChatwootFalso()
     llamadas = []
     canal.enviar = lambda conversacion, mensajes, adjuntos=None: llamadas.append(
-        (mensajes[0], adjuntos)
+        (mensajes, adjuntos)
     )
 
     asyncio.run(
         _enviar_con_ritmo(
             canal,
             "12",
-            ["primero", "segundo"],
+            ["¡Hola!", "Acá tenés la foto del FUT-01.", "¿Lo cotizamos?"],
             ritmo=False,
             adjuntos=[adjunto],
         )
     )
 
-    assert llamadas == [("primero", [adjunto]), ("segundo", None)]
+    assert llamadas == [
+        (["¡Hola!"], None),
+        (["Acá tenés la foto del FUT-01."], None),
+        ([], [adjunto]),
+        (["¿Lo cotizamos?"], None),
+    ]
 
 
 def test_el_webhook_manda_las_fotos_aunque_no_haya_texto(tmp_path):
@@ -672,7 +678,34 @@ def test_el_webhook_manda_las_fotos_aunque_no_haya_texto(tmp_path):
         _enviar_con_ritmo(canal, "12", [], ritmo=False, adjuntos=[adjunto])
     )
 
-    assert llamadas == [([""], [adjunto])]
+    assert llamadas == [([], [adjunto])]
+
+
+def test_si_ningun_globo_la_nombra_la_foto_va_despues_del_primero():
+    from agente.respuesta import intercalar_adjuntos
+
+    assert intercalar_adjuntos(["Te cuento.", "Sale US$ 22."], ["foto"]) == [
+        ("Te cuento.", ()),
+        ("", ("foto",)),
+        ("Sale US$ 22.", ()),
+    ]
+
+
+@pytest.mark.parametrize(
+    "anuncio", ["Te paso las imágenes.", "Mirá esta imagen:", "Acá van las FOTOS"]
+)
+def test_reconoce_las_formas_de_anunciar_una_foto(anuncio):
+    from agente.respuesta import intercalar_adjuntos
+
+    envios = intercalar_adjuntos(["Hola.", anuncio, "¿Algo más?"], ["foto"])
+
+    assert envios[2] == ("", ("foto",))
+
+
+def test_sin_fotos_quedan_solo_los_globos_con_texto():
+    from agente.respuesta import intercalar_adjuntos
+
+    assert intercalar_adjuntos(["uno", "  ", "dos"], None) == [("uno", ()), ("dos", ())]
 
 
 def test_la_foto_sale_aunque_el_modelo_no_escriba_texto(tmp_path):

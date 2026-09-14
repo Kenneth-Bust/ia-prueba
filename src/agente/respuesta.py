@@ -85,6 +85,36 @@ def partir_respuesta(
     return _juntar_hasta(_por_oraciones(texto, largo_de_un_mensaje), maximo)
 
 
+# Palabras con las que el modelo anuncia una foto. Solo deciden DÓNDE va la
+# imagen dentro de la respuesta: qué archivo se manda lo decide la
+# herramienta del catálogo, nunca el texto del modelo.
+_ANUNCIA_FOTO = re.compile(r"\b(fotos?|im[aá]gen(es)?)\b", re.IGNORECASE)
+
+
+def intercalar_adjuntos(mensajes: list[str], adjuntos) -> list[tuple[str, tuple]]:
+    """Ordena globos de texto y fotos como mensajes separados.
+
+    Devuelve pares (texto, adjuntos): un globo lleva texto y ningún
+    adjunto; la foto va sola, con texto vacío. Sale justo después del globo
+    que la anuncia («Acá tenés la foto…»). Si ninguno la nombra, después del
+    primero. Pegada al primer globo quedaba como epígrafe del saludo y se
+    leía fuera de lugar.
+    """
+    adjuntos = tuple(adjuntos or ())
+    envios: list[tuple[str, tuple]] = [(texto, ()) for texto in mensajes if texto.strip()]
+    if not adjuntos:
+        return envios
+    if not envios:
+        return [("", adjuntos)]
+
+    posicion = next(
+        (i for i, (texto, _) in enumerate(envios) if _ANUNCIA_FOTO.search(texto)),
+        0,
+    )
+    envios.insert(posicion + 1, ("", adjuntos))
+    return envios
+
+
 def _limpiar(texto: str) -> str:
     """Normaliza los saltos de línea que mandan los modelos."""
     return (

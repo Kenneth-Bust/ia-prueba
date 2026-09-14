@@ -85,10 +85,16 @@ El usuario pidió preparar la demo en **esta rama `piloto-demo`**, con
 catálogo, precios e imágenes ficticios, cotización automática y traspaso
 humano para trabajos a medida. El plan y el estado para continuar están en
 [docs/demo-uniformes-plan.md](docs/demo-uniformes-plan.md); leelo antes de
-implementar. **Está ejecutado en parte:** catálogo, fotos y cotizador sí
-(ver «Avance del 14/09/2026» en ese plan); el resto de las casillas sigue
-pendiente. El portal de catálogos multicliente todavía no existe: su estado
-y las decisiones tomadas están en la metodología.
+implementar. **Está ejecutado en parte:** catálogo, fotos y cotizador sí, y
+`bot-demo` ya corre esa demo, con despliegue verificado el 14/09 (ver
+«Avance del 14/09/2026» en ese plan). El resto de las casillas sigue
+pendiente.
+
+**Próximo gran trabajo: el portal `catalogos.automaticnic.online`.** Todavía
+no existe: no hay aplicación, base ni registro DNS activo. Tiene que servir
+para **cualquier rubro**, no solo uniformes, y empieza por Smarth House. El
+modelo general, la estructura por cliente y las decisiones tomadas están en
+[la metodología](docs/metodologia-clientes.md#portal-del-catálogo-y-separación-entre-negocios).
 
 El empleado no debe borrar conversaciones completas **ni mensajes
 individuales**. El ajuste de permisos se prueba en una copia aislada de

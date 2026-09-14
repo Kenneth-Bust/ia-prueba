@@ -344,9 +344,13 @@ operar, comprobá el estado real en Coolify y la huella del prompt.
 - **`MAX_TOKENS=512` en `bot-demo` corta las respuestas a mitad de frase.**
   Está bajo a propósito para el piloto. Un cliente real necesita 4096.
 
-- **El bot no envía imágenes.** Recibe y entiende fotos y audios, pero solo
-  responde texto. Cuando un cliente pide ver un producto, el bot promete
-  fotos que nunca llegan: es una venta perdida y ya pasó en pruebas reales.
+- **El bot de la agencia todavía no envía imágenes.** `agente-ia` corre
+  `main`, que solo responde texto: si alguien pide ver algo, promete fotos
+  que nunca llegan, y eso ya costó ventas en pruebas reales. El envío de
+  fotos aprobadas existe en `piloto-demo` y corre en `bot-demo` desde el
+  14/09/2026 ([plan de la demo](demo-uniformes-plan.md)). Falta llevarlo a
+  `main`; el usuario decidió que la promo de Smarth House espere al portal
+  de catálogos.
 
 - **Un solo VPS.** Compartir servidor implica compartir capacidad y caídas.
 
