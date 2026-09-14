@@ -132,6 +132,13 @@ ficticios. Si el prospecto contrata, el catálogo real pasa a PostgreSQL y las
 fotografías a almacenamiento persistente, sin guardar datos reales en este
 repositorio público.
 
+El panel futuro usa el portal multicliente común descrito en la metodología.
+El dueño entra con su propia cuenta y el servidor limita todas las operaciones
+al catálogo de este negocio. Otro cliente puede usar la misma URL, pero verá
+otros productos, precios y fotografías. Para la demo inicial solo hace falta
+una vista de los datos ficticios; la edición completa se habilita después de
+la contratación.
+
 ### Catálogo, cotización y salida con imágenes
 
 - Catálogo versionado en `catalogos/demo_uniformes.json`; imágenes en

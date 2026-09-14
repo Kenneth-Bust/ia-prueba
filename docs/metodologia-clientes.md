@@ -88,6 +88,39 @@ cliente antes de enviar el adjunto.
 Una cotización guarda una copia del nombre, precio, reglas y extras usados.
 Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 
+## Portal del catálogo y separación entre negocios
+
+La opción predeterminada es una sola aplicación web para administrar todos
+los catálogos, por ejemplo `catalogos.automaticnic.online`. No se crea otro
+programa ni otra URL obligatoria por cliente. Cada persona inicia sesión y el
+servidor obtiene de su membresía a qué `cliente_id` puede acceder.
+
+La separación no depende de que la persona conozca una URL distinta. En cada
+lectura, edición, carga de fotografía y publicación, el backend aplica el
+`cliente_id` de la sesión autenticada. Debe ignorar un `cliente_id` enviado
+libremente por el navegador y comprobar la pertenencia también en la base de
+datos. Un administrador de un negocio no puede consultar otro catálogo
+cambiando la dirección o un identificador en la petición.
+
+Roles previstos:
+
+- El administrador del negocio crea, edita, desactiva y publica sus productos.
+- Los empleados pueden consultar el catálogo publicado, pero no cambiar
+  precios, reglas ni fotografías.
+- La agencia conserva una cuenta técnica auditada para soporte. No modifica
+  información comercial sin autorización del cliente.
+
+Todos usan el mismo portal y cada negocio ve un catálogo diferente. Si más
+adelante se desea una dirección con su marca, como
+`catalogo.cliente.example`, puede ser un alias del mismo portal; no implica
+duplicar el código. Una instalación separada queda como opción para un cliente
+que requiera aislamiento contractual o de infraestructura superior.
+
+Las fotografías se guardan bajo un espacio propio, por ejemplo
+`catalogos/<cliente_id>/<sku>/principal.jpg`, y nunca se listan solo por una
+ruta que entregue el navegador. El backend comprueba sesión, producto e
+imagen antes de generar el acceso o enviar el archivo a Chatwoot.
+
 ## Cómo el bot elige la fotografía correcta
 
 El recorrido autorizado es:
