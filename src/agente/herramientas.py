@@ -33,6 +33,7 @@ from pathlib import Path
 from langchain_core.tools import tool
 
 from .catalogo import crear_herramientas_catalogo
+from .portal import crear_herramienta_promociones_portal
 from .promociones import crear_herramienta_promociones
 
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
@@ -122,11 +123,20 @@ HERRAMIENTAS = [clima]
 
 
 def herramientas_para(
-    ruta_promociones: Path | None = None, ruta_catalogo: Path | None = None
+    ruta_promociones: Path | None = None,
+    ruta_catalogo: Path | None = None,
+    portal_url: str = "",
+    portal_clave_bot: str = "",
 ) -> list:
-    """Herramientas comunes más las de catálogo habilitadas para este bot."""
+    """Herramientas comunes más las de catálogo habilitadas para este bot.
+
+    Si hay portal configurado, las promociones vienen de ahí y no del
+    archivo: son dos fuentes de la misma herramienta, nunca las dos juntas.
+    """
     disponibles = list(HERRAMIENTAS)
-    if ruta_promociones is not None:
+    if portal_url and portal_clave_bot:
+        disponibles.append(crear_herramienta_promociones_portal(portal_url, portal_clave_bot))
+    elif ruta_promociones is not None:
         disponibles.append(crear_herramienta_promociones(ruta_promociones))
     if ruta_catalogo is not None:
         disponibles.extend(crear_herramientas_catalogo(ruta_catalogo))

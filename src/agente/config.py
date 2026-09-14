@@ -107,6 +107,12 @@ class Config:
     # Catálogo de productos con fotos y cotizador (catalogo.py). Igual que el
     # de promociones: vacío deja al bot sin esas herramientas.
     catalogo_ruta: Path | None = None
+    # El portal de catálogos (docs/portal.md), como fuente de promociones en
+    # vez del archivo de promociones_ruta. Los dos vacíos: el bot sigue sin
+    # esa herramienta. Los dos a la vez no tiene sentido; si se cargan ambos,
+    # gana el portal (ver herramientas_para).
+    portal_url: str = ""
+    portal_clave_bot: str = field(default="", repr=False)
 
     @classmethod
     def desde_entorno(
@@ -179,6 +185,8 @@ class Config:
             chatwoot_bandeja_id=_identificador_opcional("CHATWOOT_BANDEJA_ID"),
             promociones_ruta=_ruta_catalogo_opcional("PROMOCIONES_RUTA"),
             catalogo_ruta=_ruta_catalogo_opcional("CATALOGO_RUTA"),
+            portal_url=(os.getenv("PORTAL_URL") or "").strip().rstrip("/"),
+            portal_clave_bot=(os.getenv("PORTAL_CLAVE_BOT") or "").strip(),
         )
 
 

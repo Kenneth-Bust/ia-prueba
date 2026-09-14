@@ -170,7 +170,10 @@ class Agente:
         # Sin esto nunca las pide, por más que estén escritas. Las de catálogo
         # dependen de la configuración de cada bot.
         herramientas = herramientas_para(
-            self.config.promociones_ruta, self.config.catalogo_ruta
+            self.config.promociones_ruta,
+            self.config.catalogo_ruta,
+            self.config.portal_url,
+            self.config.portal_clave_bot,
         )
         modelo = self.modelo.bind_tools(herramientas)
 

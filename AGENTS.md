@@ -90,10 +90,12 @@ implementar. **Está ejecutado en parte:** catálogo, fotos y cotizador sí, y
 «Avance del 14/09/2026» en ese plan). El resto de las casillas sigue
 pendiente.
 
-**Portal `catalogos.automaticnic.online`: fase 1 construida en la rama
-`portal` el 14/09, solo en local.** No está desplegado y ningún bot lo lee
-todavía. El registro DNS ya resuelve a `2.25.112.244`, el servidor de
-Coolify. Sirve para **cualquier rubro** y empieza por Smarth House.
+**Portal `catalogos.automaticnic.online`: desplegado en producción el
+14/09** (app `portal-catalogos` en Coolify, rama `portal`, base `catalogos`
+propia). El código del bot para leerlo (`src/agente/portal.py`) ya está
+escrito y probado, pero **todavía no conectado**: `agente-ia` sigue
+atendiendo con `prompts/sistema.md` como hasta ahora. Sirve para
+**cualquier rubro** y empieza por Smarth House.
 
 - Cómo está hecho, cómo correrlo y qué falta (fases 2 y 3):
   [docs/portal.md](docs/portal.md).

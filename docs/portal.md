@@ -1,8 +1,10 @@
 # Portal de catálogos — `catalogos.automaticnic.online`
 
-> **Estado al 14/09/2026: fase 1 construida y probada en local, rama `portal`.**
-> No está desplegado. No tiene aplicación en Coolify ni base de producción.
-> Ningún bot lo lee todavía: `agente-ia` y `bot-demo` siguen sin cambios.
+> **Estado al 14/09/2026: desplegado en producción y con el código del lado
+> del bot ya escrito y probado.** Falta conectar Smarth House de punta a
+> punta: `agente-ia` y `bot-demo` siguen sin cambios, y `prompts/sistema.md`
+> sigue con el precio y la fecha escritos a mano. Ver «Fase 3» más abajo
+> para el estado exacto y lo que falta.
 
 Las decisiones de negocio están en
 [la metodología](metodologia-clientes.md#portal-del-catálogo-y-separación-entre-negocios).
@@ -68,6 +70,29 @@ Roles:
 
 El paquete `portal` **no importa nada de `agente`**. Así no carga el `.env` de
 la agencia ni sus claves.
+
+## En producción
+
+Desplegado el 14/09/2026:
+
+| Cosa | Valor |
+|---|---|
+| URL | `https://catalogos.automaticnic.online`, HTTPS válido |
+| App en Coolify | `portal-catalogos`, uuid `vhvndsnvosry83dqlztwontm`, rama `portal` |
+| Imagen | `Dockerfile.portal` (no el `Dockerfile` del agente) |
+| Base | `catalogos`, rol `portal_catalogos`, mismo PostgreSQL de las memorias |
+| Fotos | Volumen Docker `portal_datos` en `/app/datos/portal` (vía `custom_docker_run_options`, no hay volumen persistente propio en la API de Coolify que se haya usado) |
+| Despliegue automático | Apagado, igual que `bot-demo` |
+| Negocios cargados | `smarth-house` (vacío: sin catálogo ni «Mi negocio» todavía) |
+
+**Antes de tocar esto:** confirmar rama y que no haya cambios locales sin
+commit, y recordar que ahora sí es producción — no es la base de pruebas
+`catalogos_pruebas`.
+
+**Pendiente chico:** `PORTAL_PROXIES=*` confía en cualquier proxy. Es
+razonable acá porque el contenedor no tiene el puerto publicado al host
+(`ports_mappings` vacío): solo Traefik llega. Si eso cambia, hay que fijar
+el rango real de la red `coolify` en vez de `*`.
 
 ## Correrlo en tu computadora
 
@@ -249,16 +274,37 @@ Siguen pendientes:
 
 **Fase 3: Smarth House con el portal** (toca producción)
 
-- Que el bot lea `/api/bot/catalogo` con su clave:
-  - Guarda la última copia y usa `If-None-Match`.
-  - Si el portal no responde, sigue con la copia anterior.
-- Herramientas: adaptar `catalogo.py` y `promociones.py` a `contenido`:
-  - `tallas` pasa a ser `opciones`.
-  - Respetar la vigencia.
-  - Bajar las fotos por `/api/bot/fotos`.
-- Prompt: regla fija de pagos (formas sí; lo demás, a una persona). Sacar de
-  `prompts/sistema.md` los datos que pasan al portal (US$ 45, 11/10/2026)
-  para que no se contradigan.
-- El envío de fotos hoy vive en `piloto-demo`. Llevarlo a `main` implica
-  desplegar `agente-ia`: probar antes en `bot-demo` y desplegar con el OK del
-  usuario.
+- ✅ **`src/agente/portal.py`**: el bot pide `/api/bot/catalogo` con su
+  clave, filtra los ítems `tipo == "promocion"` vigentes, y arma el mismo
+  texto + adjunto que ya sabe mandar `agente.py`. Reusa `imagen_aprobada`
+  indirectamente: valida tamaño y firma de la foto igual que
+  `promociones.py`, y la cachea en disco por sha256 para no volver a
+  pedirla. Si el portal no contesta, sigue con la última copia guardada
+  (`recursos/_portal_cache/<negocio>/`); esa carpeta no sobrevive un
+  redeploy (se copia una sola vez al construir la imagen), alcanza para una
+  caída de minutos, no de días.
+- ✅ **Config y herramientas**: `PORTAL_URL` + `PORTAL_CLAVE_BOT` en
+  `Config`. `herramientas_para()` arma `promociones_disponibles` con el
+  portal como fuente si están cargadas las dos; si no, sigue con
+  `PROMOCIONES_RUTA` exactamente como antes. **No se tocó** `catalogo.py`:
+  la demo de uniformes (`bot-demo`) sigue leyendo su JSON, sin cambios.
+- ✅ Probado con un HTTP falso (sin red): vigencia, promoción sin precio,
+  falla del portal con y sin copia de respaldo, foto con firma inválida,
+  no repetir la descarga de una foto ya cacheada. 12 pruebas nuevas, y las
+  377 del proyecto siguen pasando.
+- ⏳ **`prompts/sistema.md` sigue con el precio y la fecha escritos a
+  mano** (US$ 45, 11 de octubre de 2026). Migrarlo para que dependa del
+  resultado de la herramienta es un cambio de contenido, no de código: hay
+  que revisar la redacción exacta antes de tocar el prompt que vende de
+  verdad. Nada de esto se aplica sin que el usuario vea el antes/después.
+- ⏳ **Falta cargar el catálogo real de Smarth House** en el portal (el
+  usuario entra con su cuenta y lo hace él mismo) y crear la clave del bot
+  con `scripts/portal_admin.py clave-bot --negocio smarth-house --nombre
+  agente-ia` (queda en `.credenciales-portal.local`, nunca en el repo).
+- ⏳ **Probar de punta a punta en `bot-demo` antes de tocar `agente-ia`**:
+  apuntar `bot-demo` a `PORTAL_URL`/`PORTAL_CLAVE_BOT` de smarth-house (o de
+  un negocio de prueba), confirmar que la foto y el precio llegan bien por
+  Chatwoot, y recién con eso desplegar a `agente-ia`, con el OK del usuario.
+- ⏳ El envío de fotos hoy vive en `piloto-demo` (de donde sale la rama
+  `portal`); llevarlo a `main` es un paso aparte y también necesita probarse
+  en `bot-demo` primero.
