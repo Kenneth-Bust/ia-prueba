@@ -325,7 +325,8 @@ registrarlo y continuar las partes locales que no dependan de él.
 - [ ] Cotizaciones persistentes con código en `memoria_demo`.
 - [ ] Dos bandejas y simulador disponibles.
 - [ ] Chatwoot aislado y bloqueo de borrado verificados.
-- [ ] Despliegue demo y prueba real en la bandeja API completados.
+- [x] Despliegue demo y prueba real en la bandeja API completados (14/09,
+  despliegue `z4j9ombbkee4xea3p3xopuv5`, conversación 2).
 - [ ] Validación de entrega por WhatsApp con los números nuevos, después
   de la confirmación del cliente; no forma parte de la demo API inicial.
 
@@ -378,15 +379,21 @@ y el Chatwoot aislado con bloqueo de borrado.
     `CATALOGO_RUTA=catalogos/demo_uniformes.json`, `MAX_TOKENS=4096` y
     `RESPUESTA_MINIMA_SEGUNDOS=0`. La API creó copias «preview» de las dos
     variables nuevas y se borraron: quedaron 20 variables, sin repetidas.
-- **Pendiente y delicado: no hubo push ni despliegue.** El push de
-  `piloto-demo` fue bloqueado por los permisos de la sesión.
-  - `bot-demo` sigue corriendo la versión anterior. Las variables nuevas
-    recién se aplican cuando el contenedor se recrea.
-  - Si se reinicia antes del despliegue, no se cae: `leer_prompt()` usa el
-    prompt de emergencia porque la imagen vieja no tiene
-    `prompts/demo_uniformes.md`. Pero responde genérico y sin catálogo.
-  - No reiniciarlo: subir la rama y desplegar `bot-demo`, o devolver las
-    variables.
+- Push de `piloto-demo` a `98d7f03`, por pedido explícito del usuario. El
+  historial de Coolify no mostró despliegues automáticos después del push.
+- Despliegue manual único de `bot-demo`:
+  - ID `z4j9ombbkee4xea3p3xopuv5`, commit `98d7f03`, `finished` en 1 min 14 s.
+  - `/salud`: `estado: ok`, huella del prompt igual a
+    `prompts/demo_uniformes.md` de ese commit, `respuesta_minima_segundos: 0`.
+- `agente-ia` siguió `ok`, con la huella de prompt del 13/09 (`3065e976…`).
+- Prueba real en la bandeja API, conversación **2** de Cliente Demo, con el
+  código de `scripts/chat_demo.py`:
+  - «¿Me mostrás el uniforme de fútbol azul?»: llegó FUT-01 como PNG adjunto
+    (se descargó y es un PNG real) y el bot aclaró que es una demostración.
+  - «18 de ese, talla M, con nombre y número»: desglose con US$ 22.90 por
+    unidad y total US$ 412.20.
+- Detalle a pulir: la foto sale pegada al primer globo (el saludo) y no al
+  que la menciona. Funciona, pero se leería mejor en su propio mensaje.
 
 **Primer paso para el siguiente agente:** comprobar el estado de Git, leer
 este documento y confirmar qué casillas siguen pendientes. No rehacer el
