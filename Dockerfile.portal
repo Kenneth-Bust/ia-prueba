@@ -1,0 +1,41 @@
+# El portal de catálogos, en un servidor.
+#
+# Es una app aparte del agente (ver src/portal/): no atiende WhatsApp, no
+# habla con Gemini y no carga el .env del bot. Por eso tiene su propio
+# Dockerfile en vez de reusar el de arriba: comparte el repositorio, pero
+# nada de la imagen ni del proceso.
+#
+# Toda la configuración entra por variables de entorno (PORTAL_*, ver
+# .env.portal.example y docs/portal.md). El .env no se copia acá adentro:
+# en el servidor las variables las pone Coolify.
+
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+
+WORKDIR /app
+
+# curl es para el health check del panel (ver Dockerfile, misma razón).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Solo lo que el portal necesita: FastAPI, uvicorn, dotenv, psycopg y su
+# pool. Nada de LangChain/LangGraph ni de las claves de un proveedor de IA.
+COPY requirements-portal.txt ./
+RUN pip install --no-cache-dir -r requirements-portal.txt
+
+COPY src/portal/ ./src/portal/
+COPY portal_catalogos.py ./
+
+# El portal escribe fotos a disco (PORTAL_ARCHIVOS): necesita un volumen
+# persistente montado ahí, y un usuario dueño de esa carpeta.
+RUN useradd --create-home portal && mkdir -p /app/datos/portal && chown -R portal:portal /app
+USER portal
+
+ENV PUERTO=8010
+ENV PORTAL_HOST=0.0.0.0
+EXPOSE 8010
+
+CMD ["python", "portal_catalogos.py"]

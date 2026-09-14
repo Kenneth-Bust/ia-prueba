@@ -1,0 +1,16 @@
+# Lo que necesita el portal de catálogos (src/portal/, portal_catalogos.py)
+# para correr en un servidor. Es un subconjunto de requirements.txt +
+# requirements-produccion.txt: no carga LangChain/LangGraph ni las claves
+# de un proveedor de IA, porque el portal no le habla a ningún modelo.
+#
+# Las versiones están pinneadas igual que en los otros requirements, por la
+# misma razón: que una versión mayor nueva no rompa el servidor sin avisar.
+
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-dotenv>=1.0,<2
+
+# Mismo Postgres que usan las memorias de los bots, con su propio pool de
+# conexiones. [binary] trae la libpq adentro (ver requirements.txt).
+psycopg[binary]>=3.2,<4
+psycopg_pool>=3.2,<4
