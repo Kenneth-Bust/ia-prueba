@@ -368,7 +368,25 @@ y el Chatwoot aislado con bloqueo de borrado.
   - No tiene `CATALOGO_RUTA` ni variables repetidas.
   - `settings.is_auto_deploy_enabled` es `true`, pero los dos últimos
     despliegues (11/09) fueron manuales.
-- Al cerrar este avance no hubo push ni despliegue.
+- `scripts/chat_demo.py`: chat local para la reunión. Crea conversaciones
+  sintéticas en Pruebas Demo y muestra las respuestas reales del bot con sus
+  fotos. Instrucciones en su docstring.
+- Cambios en Coolify autorizados por el usuario el 14/09, solo en `bot-demo`:
+  - Despliegue automático apagado: `is_auto_deploy_enabled` pasó de `true` a
+    `false`. `agente-ia` no se tocó y sigue en `true`.
+  - Variables: `PROMPT_SISTEMA=prompts/demo_uniformes.md`,
+    `CATALOGO_RUTA=catalogos/demo_uniformes.json`, `MAX_TOKENS=4096` y
+    `RESPUESTA_MINIMA_SEGUNDOS=0`. La API creó copias «preview» de las dos
+    variables nuevas y se borraron: quedaron 20 variables, sin repetidas.
+- **Pendiente y delicado: no hubo push ni despliegue.** El push de
+  `piloto-demo` fue bloqueado por los permisos de la sesión.
+  - `bot-demo` sigue corriendo la versión anterior. Las variables nuevas
+    recién se aplican cuando el contenedor se recrea.
+  - Si se reinicia antes del despliegue, no se cae: `leer_prompt()` usa el
+    prompt de emergencia porque la imagen vieja no tiene
+    `prompts/demo_uniformes.md`. Pero responde genérico y sin catálogo.
+  - No reiniciarlo: subir la rama y desplegar `bot-demo`, o devolver las
+    variables.
 
 **Primer paso para el siguiente agente:** comprobar el estado de Git, leer
 este documento y confirmar qué casillas siguen pendientes. No rehacer el
