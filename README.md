@@ -9,9 +9,15 @@ clientes usá la [metodología común](docs/metodologia-clientes.md): configurac
 y datos propios, sin una rama permanente por cliente. Las instrucciones
 locales siguientes describen la base de AgentKit.
 
-Para preparar una segunda marca separada de tu agencia, seguí la
-[guía del piloto Cliente Demo](docs/piloto-demo.md). Incluye la configuración
-de Chatwoot, la memoria independiente y el despliegue en Coolify.
+[Índice de documentación vigente](docs/README.md) ·
+[Qué prompt usa cada entorno](docs/prompts.md) ·
+[Documentación histórica](docs/archivo/README.md).
+
+El estado de la demo de uniformes está en el [piloto actual](docs/piloto-demo.md).
+La guía original para preparar una segunda marca separada de tu agencia
+(Chatwoot, memoria independiente y despliegue en Coolify) quedó en el
+[archivo](docs/archivo/piloto-inicial.md): antes de repetir un paso,
+compará con [operación](docs/operacion.md).
 
 Un agente de IA que corre **en tu computadora**. Sin servidor, sin hosting,
 sin pagar infraestructura. Funciona con **Claude, OpenAI o Gemini** —
@@ -28,7 +34,7 @@ gastás en cada mensaje.
 ┌──────────────────────────────────────────────────┐
 │  Vos escribís                                     │
 │      ↓                                            │
-│  Prompt del sistema  ← prompts/sistema.md         │
+│  Prompt del sistema  ← el .md de PROMPT_SISTEMA   │
 │  Memoria             ← LangGraph (thread_id)      │
 │  Modelo              ← Claude / OpenAI / Gemini   │
 │  Herramientas        ← el clima                   │
@@ -125,7 +131,10 @@ Abrí **http://localhost:8000**.
 ```
 basdonax-ai-agentkit/
 ├── prompts/
-│   └── sistema.md          ← la personalidad del agente (editalo)
+│   ├── smarth_house_portal.md ← Smarth House en producción
+│   ├── demo_uniformes.md      ← demo de uniformes
+│   ├── plantillas/           ← general.md y cliente_demo.md
+│   └── archivo/              ← oferta anterior, para referencia
 ├── src/agente/
 │   ├── agente.py           ← EL AGENTE. El grafo de LangGraph.
 │   ├── herramientas.py     ← lo que sabe hacer además de hablar (el clima)
@@ -655,7 +664,10 @@ el contenedor.
 
 ## Cambiar la personalidad
 
-Editá **`prompts/sistema.md`**, guardá, y el próximo mensaje ya sale distinto.
+En pruebas locales, editá el archivo elegido por **`PROMPT_SISTEMA`**, guardá
+y el próximo mensaje ya sale distinto. Las instalaciones nuevas usan
+`prompts/plantillas/general.md`; una configuración anterior puede seleccionar
+otro archivo. El [mapa de prompts](docs/prompts.md) explica las rutas.
 **No hay que reiniciar nada**: el archivo se lee en cada mensaje.
 
 Desde la web lo tenés al costado, con un botón de guardar.
@@ -739,7 +751,7 @@ la herramienta le sirve. Si está mal escrito, la herramienta no se usa nunca.
 | `CACHE` | `true` | Cachear el prompt del sistema |
 | `MAX_TOKENS` | `4096` | Cuánto puede escribir el agente por respuesta |
 | `MEMORIA_MENSAJES` | `20` | Cuántos mensajes recuerda |
-| `PROMPT_SISTEMA` | `prompts/sistema.md` | Qué archivo usar de personalidad |
+| `PROMPT_SISTEMA` | `prompts/plantillas/general.md` | Qué archivo usar de personalidad |
 | `TELEGRAM_TOKEN` | — | El token de @BotFather, para `bot_telegram.py` |
 
 Y estas, solo si vas a atender WhatsApp con `webhook_chatwoot.py`:

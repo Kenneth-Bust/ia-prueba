@@ -207,7 +207,7 @@ class Agente:
         """Prompt de sistema + los últimos mensajes de la conversación.
 
         El prompt se lee del archivo en CADA mensaje, no una sola vez al
-        arrancar: por eso podés editar prompts/sistema.md sin reiniciar.
+        arrancar: por eso podés editar el archivo elegido sin reiniciar.
         """
         recientes = _recortar(estado["messages"], self.config.memoria_mensajes)
         return [self._sistema(), *recientes]

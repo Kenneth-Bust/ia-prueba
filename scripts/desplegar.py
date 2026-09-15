@@ -155,7 +155,7 @@ def validar_prompt(ruta: str) -> str:
 
 def estado(
     config: ConfigDespliegue, identificador: str, revision: str,
-    prompt: str = "prompts/sistema.md",
+    prompt: str = "prompts/smarth_house_portal.md",
 ) -> str:
     validar_prompt(prompt)
     if not re.fullmatch(r"[A-Za-z0-9_-]+", identificador):
@@ -187,7 +187,7 @@ def main(argumentos=None) -> int:
     parser.add_argument("identificador", nargs="?")
     parser.add_argument("--commit", default="")
     parser.add_argument(
-        "--prompt", default="prompts/sistema.md",
+        "--prompt", default="prompts/smarth_house_portal.md",
         help="Prompt esperado en ese commit. No cambia las variables de Coolify.",
     )
     args = parser.parse_args(argumentos)

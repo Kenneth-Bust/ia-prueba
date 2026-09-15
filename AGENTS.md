@@ -6,6 +6,9 @@ siga la convención `AGENTS.md`. Está para que entiendan el repo sin que se lo
 tengas que explicar cada vez.
 
 Si sos una persona: leé el `README.md`, es el que está escrito para vos.
+El [índice de documentación vigente](docs/README.md) separa operación y planes
+activos de los antecedentes en `docs/archivo/`. El mapa de los archivos de
+instrucciones está en [docs/prompts.md](docs/prompts.md).
 
 ---
 
@@ -26,7 +29,7 @@ Lo mínimo antes de seguir leyendo:
   prospectos de la agencia: no despliegues sin probar.
 - **Smarth House usa `prompts/smarth_house_portal.md`**, seleccionado por
   `PROMPT_SISTEMA`. Precios, vigencias, beneficios y fotos salen del catálogo
-  publicado del portal. `prompts/sistema.md` conserva el enfoque anterior
+  publicado del portal. `prompts/archivo/smarth_house_sin_portal.md` conserva el enfoque anterior
   para referencia y reversión; ya no es el prompt activo de la agencia.
 - **El objetivo comercial es coordinar una demo por videollamada.** La
   presentación incluye mensualidad, CRM y app para el celular; instalación
@@ -103,7 +106,7 @@ y no combina fuentes locales. Las fotos ya se entregan por WhatsApp.
 **Continuación: leer primero
 [docs/despliegue-smarth-portal.md](docs/despliegue-smarth-portal.md).** Tiene
 commits, despliegues, pruebas, corrección de persistencia y respaldos
-restaurados. La [revisión previa](docs/revision-portal-smarth-house.md) es
+restaurados. La [revisión previa](docs/archivo/revision-portal-smarth-house.md) es
 histórica: su autorización y migración pendientes ya fueron resueltas.
 No recrear servicios o claves ni borrar memorias. Faltan respaldos periódicos
 fuera del VPS y limitar el rol de la memoria heredada.
@@ -163,7 +166,7 @@ Lo que importa acá es qué hace cada uno:
 | `portal.py` / `fuente_portal.py` | Herramientas del catálogo publicado y lectura autenticada del negocio |
 | `modelos.py` | Crea el modelo y le pregunta al proveedor cuáles tiene |
 | `memoria.py` | Los checkpointers: `ram` / `sqlite` / `postgres` |
-| `prompts.py` | Lee y guarda el prompt elegido por `PROMPT_SISTEMA` (sistema.md por defecto) |
+| `prompts.py` | Lee y guarda el prompt elegido por `PROMPT_SISTEMA` (plantilla general por defecto) |
 | `respuesta.py` | Parte una respuesta larga en varios mensajes |
 | `consola.py` | Que la terminal de Windows no rompa con las tildes |
 | `config.py` | Lee el `.env`. Única fuente de configuración. |
@@ -194,8 +197,11 @@ elige. Cambiar dónde se guardan las conversaciones no toca `agente.py`.
 
 **3. El prompt del sistema vive en un archivo, no en el código.**
 El archivo elegido por `PROMPT_SISTEMA`, leído en **cada** mensaje (no una vez
-al arrancar). Por defecto es `prompts/sistema.md`; Smarth House usa
+al arrancar). Por defecto es `prompts/plantillas/general.md`; Smarth House usa
 `prompts/smarth_house_portal.md`.
+Las rutas anteriores de `.env` se resuelven en `config.ruta_del_prompt()`
+al mismo contenido archivado o reubicado. No recuperar esos archivos en la
+raíz de `prompts/` ni usarlos como identidad predeterminada de nuevos clientes.
 Por eso se puede editar con el agente corriendo.
 
 **4. Toda la configuración sale del `.env`, vía `config.py`.**

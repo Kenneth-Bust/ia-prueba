@@ -1,6 +1,6 @@
 """Carga del prompt del sistema desde un archivo de texto.
 
-El prompt vive en prompts/sistema.md, no adentro del código. Dos motivos:
+El prompt vive en el archivo elegido por PROMPT_SISTEMA. Dos motivos:
 lo podés editar sin tocar Python, y se relee en cada mensaje — o sea que
 cambiás la personalidad del agente con el agente andando.
 """

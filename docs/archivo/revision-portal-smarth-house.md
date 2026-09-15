@@ -2,7 +2,7 @@
 
 > **Revisión histórica, anterior al despliegue.** El usuario autorizó después
 > la migración y ya se ejecutó. Para continuar, leer primero
-> [despliegue-smarth-portal.md](despliegue-smarth-portal.md): Smarth House
+> [despliegue-smarth-portal.md](../despliegue-smarth-portal.md): Smarth House
 > consulta el portal y envía fotos, con respuestas breves. No volver a pedir
 > la autorización pendiente descrita aquí ni repetir las altas o los envíos.
 > Los estados, ramas y pendientes de las secciones siguientes corresponden
@@ -10,8 +10,8 @@
 
 Revisión del **14/09/2026**, trabajada en la rama **portal**, desde
 `4353f20`. Este documento describe el resultado de la revisión, lo que se
-probó y lo que falta. Leerlo junto con [operación](operacion.md) y
-[metodología](metodologia-clientes.md) antes de continuar.
+probó y lo que falta. Leerlo junto con [operación](../operacion.md) y
+[metodología](../metodologia-clientes.md) antes de continuar.
 
 ## Estado real: qué se cambió y qué sigue igual
 
@@ -225,9 +225,9 @@ diagnóstico; no se modificaron certificados globales o del servidor.
 
 ## Prompt listo para revisión
 
-El antes completo permanece en [sistema.md](../prompts/sistema.md).
+El antes completo permanece en [prompt anterior archivado](../../prompts/archivo/smarth_house_sin_portal.md).
 El después completo está en
-[smarth_house_portal.md](../prompts/smarth_house_portal.md).
+[smarth_house_portal.md](../../prompts/smarth_house_portal.md).
 
 | Tema | Actual en producción | Candidato |
 |---|---|---|
@@ -244,7 +244,7 @@ El después completo está en
 Comparación completa en terminal:
 
 ```powershell
-git diff --no-index -- prompts/sistema.md prompts/smarth_house_portal.md
+git diff --no-index -- prompts/archivo/smarth_house_sin_portal.md prompts/smarth_house_portal.md
 ```
 
 Ese comando puede devolver código 1 porque los archivos son diferentes.
@@ -274,7 +274,7 @@ No implica un error de despliegue. La huella observada del prompt de producción
    `CATALOGO_RUTA` y `PROMOCIONES_RUTA` vacíos para esta agencia.
    Mantener DSN, identidad de memoria, cuenta/bandeja y tiempos actuales:
    mínimo de respuesta 15 s y buffer 5 s.
-6. Seguir [despliegue](despliegue.md) con
+6. Seguir [despliegue](../despliegue.md) con
    `--prompt prompts/smarth_house_portal.md`. Si el push ya inició un
    despliegue, consultar su ID con estado; no iniciar un segundo.
    El script solo despliega agente-ia. El arreglo de fotos del portal requiere

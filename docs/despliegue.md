@@ -56,10 +56,10 @@ Con un entorno virtual activado también sirve `python scripts/desplegar.py`.
   python scripts/desplegar.py estado ID_DEL_DESPLIEGUE --commit COMMIT_COMPLETO
   ```
 
-**Prompt activo de Smarth House.** El valor predeterminado del script sigue
-siendo `prompts/sistema.md`, pero producción ya usa
-`PROMPT_SISTEMA=prompts/smarth_house_portal.md` desde el 14/09. Hay que indicar
-el archivo esperado tanto al desplegar como al continuar con `estado`:
+**Prompt activo de Smarth House.** Producción usa
+`PROMPT_SISTEMA=prompts/smarth_house_portal.md` desde el 14/09. La limpieza
+del 15/09 alinea el valor predeterminado del script con ese archivo. Conviene
+seguir indicándolo expresamente al desplegar o continuar con `estado`:
 
 ```text
 python scripts/desplegar.py desplegar --prompt prompts/smarth_house_portal.md
@@ -71,6 +71,11 @@ python scripts/desplegar.py estado ID_DEL_DESPLIEGUE --commit COMMIT_COMPLETO --
 para continuar conserva esa opción. Cuando hay portal, comprobar también
 `catalogo_fuente` y `reglas_catalogo_sha256` en `/salud`; ninguna huella
 reemplaza la prueba funcional de lectura del catálogo y entrega de la foto.
+
+Para revisar un despliegue histórico, indicar el archivo que existía en
+aquel commit. Por ejemplo, `--prompt prompts/sistema.md` para la versión
+anterior a la conexión del portal. El comando lee el archivo de Git, no lo
+busca en el árbol actual. Esa opción no cambia el prompt del bot en vivo.
 
 En `estado`, salida 0 significa terminado y verificado, 2 significa pendiente
 y 1 indica un error que revisar. Si una llamada de despliegue pierde la

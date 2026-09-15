@@ -2,7 +2,7 @@
 
 Registro del **14/09/2026, hora de Nicaragua** (las operaciones posteriores
 a las 18:00 aparecen como 15/09 en UTC). Sustituye los pendientes de
-[la revisión previa](revision-portal-smarth-house.md). El usuario autorizó
+[la revisión previa](archivo/revision-portal-smarth-house.md). El usuario autorizó
 continuar hasta dejar la actualización funcionando, y después pidió reducir
 las respuestas del bot y revisar el aviso de seguridad de Coolify.
 
@@ -26,9 +26,11 @@ Chatwoot: **1 y 1**, con filtros activos. La memoria conserva su DSN y sus
 `thread_id`; no se borraron conversaciones ni se modificaron etiquetas de
 prospectos. Buffer 5 s, mínimo de respuesta 15 s y ritmo humano activado.
 
-El prompt anterior `prompts/sistema.md` se conserva igual que en `44bc631`
-para referencia y reversión. **Editar ese archivo ya no cambia el bot de
-Smarth House.** El prompt del portal contiene conducta y política comercial;
+El prompt anterior, entonces `prompts/sistema.md`, se conserva igual que
+en `44bc631`. Desde la limpieza del 15/09 está en
+`prompts/archivo/smarth_house_sin_portal.md`, para referencia y reversión.
+**Editar ese archivo ya no cambia el bot de Smarth House.**
+El prompt del portal contiene conducta y política comercial;
 los precios, vigencias y beneficios del plan salen de la publicación.
 
 `bot-demo` y `piloto-demo` se conservaron. El contenedor del piloto sigue

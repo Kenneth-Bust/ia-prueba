@@ -24,7 +24,7 @@ def cliente_aislado(monkeypatch, cuenta="2", bandeja="6", respuestas=None):
         chatwoot_webhook_token="secreto-demo",
         buffer_segundos=0,
         ritmo_humano=False,
-        prompt_sistema=RAIZ / "prompts/demo.md",
+        prompt_sistema=RAIZ / "prompts/plantillas/cliente_demo.md",
     )
     llamadas = []
 

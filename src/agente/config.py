@@ -22,6 +22,18 @@ load_dotenv(RAIZ / ".env")
 PROVEEDORES_VALIDOS = ("claude", "openai", "gemini")
 MODOS_VALIDOS = ("test", "produccion")
 
+
+def ruta_del_prompt() -> Path:
+    """Resuelve el archivo elegido y conserva las configuraciones anteriores."""
+    ruta = RAIZ / os.getenv("PROMPT_SISTEMA", "prompts/plantillas/general.md")
+    # Los .env privados no viajan con Git. Las rutas antiguas conservan su
+    # mismo contenido al actualizar el repo, sin caer en el prompt de emergencia.
+    anteriores = {
+        RAIZ / "prompts/sistema.md": RAIZ / "prompts/archivo/smarth_house_sin_portal.md",
+        RAIZ / "prompts/demo.md": RAIZ / "prompts/plantillas/cliente_demo.md",
+    }
+    return anteriores.get(ruta, ruta)
+
 # Qué variable de entorno lleva la clave de cada proveedor
 CLAVE_POR_PROVEEDOR = {
     "claude": "ANTHROPIC_API_KEY",
@@ -190,7 +202,7 @@ class Config:
             api_key=api_key,
             max_tokens=_entero("MAX_TOKENS", 4096),
             memoria_mensajes=_entero("MEMORIA_MENSAJES", 20),
-            prompt_sistema=RAIZ / os.getenv("PROMPT_SISTEMA", "prompts/sistema.md"),
+            prompt_sistema=ruta_del_prompt(),
             modo=modo,
             cache=_booleano("CACHE", True),
             sqlite_ruta=os.getenv("SQLITE_RUTA", "datos/conversaciones.db"),

@@ -7,7 +7,6 @@ cambiar de modelo en caliente y editar el prompt sin reiniciar nada.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -16,12 +15,12 @@ from pydantic import BaseModel
 
 from ..agente import Agente
 from ..config import (
-    RAIZ,
     Config,
     ErrorDeConfiguracion,
     clave_de,
     guardar_ajustes,
     proveedores_disponibles,
+    ruta_del_prompt,
 )
 from ..modelos import listar_modelos, olvidar_modelos
 from ..prompts import guardar_prompt, leer_prompt
@@ -250,7 +249,7 @@ def _evento(tipo: str, datos: dict) -> str:
 
 
 def _ruta_prompt() -> Path:
-    return RAIZ / os.getenv("PROMPT_SISTEMA", "prompts/sistema.md")
+    return ruta_del_prompt()
 
 
 def _mensajes_en_memoria() -> int:

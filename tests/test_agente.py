@@ -43,7 +43,7 @@ def agente_falso(respuestas: list[str], memoria_mensajes: int = 20) -> Agente:
         api_key="no-hace-falta",
         max_tokens=1024,
         memoria_mensajes=memoria_mensajes,
-        prompt_sistema=RAIZ / "prompts/sistema.md",
+        prompt_sistema=RAIZ / "prompts/plantillas/general.md",
     )
 
     a = Agente.__new__(Agente)
@@ -298,7 +298,7 @@ def test_modo_produccion_sin_dsn_avisa(monkeypatch):
 
     config = Config(
         proveedor="claude", modelo="x", api_key="x", max_tokens=100,
-        memoria_mensajes=10, prompt_sistema=RAIZ / "prompts/sistema.md",
+        memoria_mensajes=10, prompt_sistema=RAIZ / "prompts/plantillas/general.md",
         modo="produccion", postgres_dsn="",
     )
 
@@ -312,7 +312,7 @@ def test_modo_test_guarda_en_sqlite(tmp_path):
     archivo = tmp_path / "prueba.db"
     config = Config(
         proveedor="claude", modelo="x", api_key="x", max_tokens=100,
-        memoria_mensajes=10, prompt_sistema=RAIZ / "prompts/sistema.md",
+        memoria_mensajes=10, prompt_sistema=RAIZ / "prompts/plantillas/general.md",
         modo="test", sqlite_ruta=str(archivo),
     )
 
@@ -374,6 +374,36 @@ def test_modo_invalido_avisa(monkeypatch):
 
     with pytest.raises(ErrorDeConfiguracion, match="MODO"):
         Config.desde_entorno("claude")
+
+
+@pytest.mark.parametrize("valor,archivo", [
+    ("prompts/sistema.md", "prompts/archivo/smarth_house_sin_portal.md"),
+    ("prompts/demo.md", "prompts/plantillas/cliente_demo.md"),
+    ("prompts/smarth_house_portal.md", "prompts/smarth_house_portal.md"),
+    ("prompts/demo_uniformes.md", "prompts/demo_uniformes.md"),
+])
+def test_el_prompt_elegido_existe_aunque_venga_de_una_ruta_vieja(monkeypatch, valor, archivo):
+    """Un .env de otra PC puede seguir apuntando a donde estaban los prompts.
+
+    Los .env no viajan con Git. Si la ruta vieja no se reconociera, el bot
+    arrancaría con el prompt de emergencia y nadie se enteraría hasta leer
+    una respuesta rara.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "clave-de-prueba")
+    monkeypatch.setenv("PROMPT_SISTEMA", valor)
+
+    ruta = Config.desde_entorno("claude").prompt_sistema
+    assert ruta == RAIZ / archivo
+    assert ruta.is_file()
+
+
+def test_sin_prompt_elegido_usa_la_plantilla_general(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "clave-de-prueba")
+    monkeypatch.delenv("PROMPT_SISTEMA", raising=False)
+
+    ruta = Config.desde_entorno("claude").prompt_sistema
+    assert ruta == RAIZ / "prompts/plantillas/general.md"
+    assert ruta.is_file()
 
 
 def test_olvidar_borra_de_verdad():

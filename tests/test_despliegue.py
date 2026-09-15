@@ -38,7 +38,7 @@ def test_credenciales_locales_se_releen_y_no_se_imprimen(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("rama,cambios,remoto", [
-    ("piloto-demo", "", REVISION), ("main", " M prompts/sistema.md", REVISION),
+    ("piloto-demo", "", REVISION), ("main", " M prompts/smarth_house_portal.md", REVISION),
     ("main", "", "b" * 40),
 ])
 def test_no_despliega_una_revision_sin_preparar(rama, cambios, remoto, monkeypatch):
@@ -120,7 +120,11 @@ def test_finalizado_exige_commit_y_prompt_correctos(monkeypatch):
             return salud
         return despliegue
     monkeypatch.setattr(d, "pedir", pedir)
-    monkeypatch.setattr(d, "git", lambda *args: "oferta")
+    def git(*args):
+        assert args == ("show", f"{REVISION}:prompts/smarth_house_portal.md")
+        return "oferta"
+
+    monkeypatch.setattr(d, "git", git)
     assert d.estado(CONFIG, "prueba123", REVISION) == "finished"
     despliegue["commit"] = "b" * 40
     with pytest.raises(d.ErrorDespliegue, match="commit"):

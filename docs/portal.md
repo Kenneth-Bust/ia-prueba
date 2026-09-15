@@ -305,7 +305,7 @@ verificaron; faltan copias automáticas periódicas fuera del VPS.
   descripción con confirmación del usuario; la clave de lectura ya existe.
   Su archivo local es `.env.bot-portal.local`, ignorado por Git y Docker.
 - ✅ El prompt activo está en `prompts/smarth_house_portal.md` y responde
-  progresivamente según la pregunta. `prompts/sistema.md` se conserva.
+  progresivamente según la pregunta. El prompt anterior se conserva en `prompts/archivo/smarth_house_sin_portal.md`.
 - ✅ Recorrido completo del webhook en contenedor aislado, con Gemini y
   Chatwoot cuenta 2, bandeja 3, conversación 5; foto comprobada por sus bytes.
   El webhook temporal se retiró; la demo original siguió atendiendo.

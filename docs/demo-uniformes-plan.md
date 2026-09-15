@@ -1,9 +1,12 @@
 # Demo de uniformes y sublimación — plan y contexto de continuidad
 
-Actualizado: **14/09/2026**. Objetivo de presentación: **15/09/2026**, según
-el pedido del dueño. Este documento es un plan: **la nueva demo todavía no
-está implementada ni desplegada**. No interpretar la fecha como una promesa
-de entrega o una prueba de funcionamiento.
+Estado aclarado el **15/09/2026**: catálogo, fotos y cotizador **ya están
+implementados y desplegados** en bot-demo desde el 14/09. Siguen pendientes
+dos líneas/bandejas, simulador y bloqueo de borrado en Chatwoot aislado.
+Consultar el [piloto actual](piloto-demo.md) y las casillas de la sección 6.
+Las secciones de pedido y punto de partida conservan el plan original y sus
+observaciones de entonces; los avances posteriores los actualizan. La fecha
+de presentación propuesta, 15/09, no certifica el cumplimiento del resto.
 
 ## 1. Pedido confirmado y alcance
 
@@ -350,7 +353,8 @@ y el Chatwoot aislado con bloqueo de borrado.
   - Se activa con `CATALOGO_RUTA`.
   - Herramientas `ver_catalogo`, `mostrar_fotos` y `cotizar_pedido`.
   - Prompt `prompts/demo_uniformes.md`. `prompts/demo.md` queda intacto porque
-    lo usan los scripts del piloto.
+    lo usan los scripts del piloto. Desde el 15/09 está en
+    `prompts/plantillas/cliente_demo.md`, con el mismo contenido.
 - Las seis fotos son ilustraciones vectoriales pasadas a PNG. Llevan «DEMO»
   e «Imagen ficticia de demostración»; no son fotografías.
 - Pruebas: 255 aprobadas con modelos falsos.

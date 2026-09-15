@@ -40,7 +40,7 @@ def configurar_agente() -> Agente:
     agente = Agente.__new__(Agente)
     agente.config = Config(
         proveedor="gemini", modelo="modelo-falso", api_key="sin-proveedor",
-        max_tokens=100, memoria_mensajes=20, prompt_sistema=RAIZ / "prompts/demo.md",
+        max_tokens=100, memoria_mensajes=20, prompt_sistema=RAIZ / "prompts/plantillas/cliente_demo.md",
         modo="produccion", postgres_dsn=dsn,
     )
     agente.modelo = ModeloFalso(messages=iter([AIMessage("Prueba de Cliente Demo.")]))

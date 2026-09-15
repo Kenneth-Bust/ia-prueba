@@ -45,7 +45,7 @@ las variables de entorno de Coolify.
 
 La integración ya está desplegada en `agente-ia` desde `main`, con
 `PROMPT_SISTEMA=prompts/smarth_house_portal.md`. Consulta el catálogo publicado
-y envía sus fotos por WhatsApp. `prompts/sistema.md` conserva el prompt
+y envía sus fotos por WhatsApp. `prompts/archivo/smarth_house_sin_portal.md` conserva el prompt
 anterior como referencia; ya no es el activo de la agencia.
 
 La oferta sigue en versión 4: Promoción, US$45 al mes por número, descripción
