@@ -1,5 +1,13 @@
 # Conexión del catálogo con Smarth House: revisión y continuidad
 
+> **Revisión histórica, anterior al despliegue.** El usuario autorizó después
+> la migración y ya se ejecutó. Para continuar, leer primero
+> [despliegue-smarth-portal.md](despliegue-smarth-portal.md): Smarth House
+> consulta el portal y envía fotos, con respuestas breves. No volver a pedir
+> la autorización pendiente descrita aquí ni repetir las altas o los envíos.
+> Los estados, ramas y pendientes de las secciones siguientes corresponden
+> al momento de esta revisión, salvo las correcciones expresas.
+
 Revisión del **14/09/2026**, trabajada en la rama **portal**, desde
 `4353f20`. Este documento describe el resultado de la revisión, lo que se
 probó y lo que falta. Leerlo junto con [operación](operacion.md) y
@@ -103,8 +111,11 @@ diferentes se pueden preparar dos aplicaciones, cada una con su bandeja,
 línea y memoria. Un único proceso que enrute dinámicamente varias bandejas
 queda pendiente. No se conectaron los números del prospecto de uniformes.
 
-Las fotos reales están fuera de Git, en el volumen `portal_datos` montado en
-`/app/datos/portal`; `Almacen` separa los archivos por negocio. PostgreSQL
+**Corrección posterior:** la afirmación original de que existía el volumen
+`portal_datos` era incorrecta; el contenedor no tenía montajes. Se respaldaron
+las fotos y se configuró un bind mount persistente en `/app/datos/portal`,
+verificado tras el despliegue (rutas en el nuevo registro).
+`Almacen` separa los archivos por negocio. PostgreSQL
 guarda la relación negocio → SKU → foto, su identificador, tipo, tamaño y
 huella. El bot no inventa URLs: descarga el identificador autorizado,
 comprueba los bytes y adjunta el archivo a Chatwoot.
@@ -240,7 +251,7 @@ Ese comando puede devolver código 1 porque los archivos son diferentes.
 No implica un error de despliegue. La huella observada del prompt de producción:
 `3065e9761ddad910bae5d2595f37c0ca760a941e0f228b6da6450e8c999709b5`.
 
-## Continuación segura
+## Continuación prevista en esa revisión (ya ejecutada; ver registro actual)
 
 1. Revisar el candidato con el usuario y obtener su autorización explícita
    para migrar el bot de la campaña. Su instrucción separa esa aprobación de

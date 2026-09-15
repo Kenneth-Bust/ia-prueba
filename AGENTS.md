@@ -24,8 +24,10 @@ Lo mínimo antes de seguir leyendo:
 
 - **`agente-ia` corre `main` y atiende WhatsApp real.** Del otro lado hay
   prospectos de la agencia: no despliegues sin probar.
-- **`prompts/sistema.md` es la vidriera del negocio**, no un ejemplo. Vende
-  el servicio de la agencia con precios reales.
+- **Smarth House usa `prompts/smarth_house_portal.md`**, seleccionado por
+  `PROMPT_SISTEMA`. Precios, vigencias, beneficios y fotos salen del catálogo
+  publicado del portal. `prompts/sistema.md` conserva el enfoque anterior
+  para referencia y reversión; ya no es el prompt activo de la agencia.
 - **El objetivo comercial es coordinar una demo por videollamada.** La
   presentación incluye mensualidad, CRM y app para el celular; instalación
   y contratación las conversa el asesor. No vuelvas a introducir la
@@ -40,8 +42,9 @@ Lo mínimo antes de seguir leyendo:
   memorias como rutina: el cambio comercial conserva el contexto de los
   prospectos. Cualquier limpieza se limita a pruebas identificadas; para
   borrados masivos rigen las condiciones de [operación](docs/operacion.md#la-memoria-arrastra-la-identidad-anterior).
-- La rama `piloto-demo` suma el filtro por cuenta y bandeja, y **todavía no
-  está mergeada a `main`**.
+- `main` ya incluye los filtros por cuenta y bandeja y el envío de fotos.
+  Smarth House tiene cuenta **1**, bandeja **1**. La demo sigue en
+  `piloto-demo`, con su aplicación y datos propios.
 
 ### Despliegue compartido por Codex y Claude
 
@@ -50,7 +53,7 @@ raíz del proyecto y con su entorno de Python:
 
 ```bash
 python scripts/desplegar.py comprobar
-python scripts/desplegar.py desplegar
+python scripts/desplegar.py desplegar --prompt prompts/smarth_house_portal.md
 ```
 
 `comprobar` es de lectura. `desplegar` se usa cuando el usuario pidió el
@@ -90,22 +93,26 @@ implementar. **Está ejecutado en parte:** catálogo, fotos y cotizador sí, y
 «Avance del 14/09/2026» en ese plan). El resto de las casillas sigue
 pendiente.
 
-**Portal `catalogos.automaticnic.online`: desplegado en producción el
-14/09** (app `portal-catalogos` en Coolify, rama `portal`, base `catalogos`
-propia). El código del bot para leerlo (`src/agente/portal.py`) ya está
-escrito y probado, pero **todavía no conectado**: `agente-ia` sigue
-atendiendo con `prompts/sistema.md` como hasta ahora. Sirve para
-**cualquier rubro** y empieza por Smarth House.
+**Portal y Smarth House conectados en producción el 14/09** (hora de
+Nicaragua). El portal usa la app `portal-catalogos`, rama `portal`, base
+`catalogos` propia y fotos en un bind mount persistente verificado.
+`agente-ia` ejecuta la integración desde `main`. Consulta productos,
+servicios, promociones, perfil y cotizaciones; exige identidad del negocio
+y no combina fuentes locales. Las fotos ya se entregan por WhatsApp.
 
-**Continuación de la conexión Smarth House:** leer
-[docs/revision-portal-smarth-house.md](docs/revision-portal-smarth-house.md).
-La rama actual de ese trabajo es **portal**. El nuevo consumidor consulta
-productos, servicios, promociones, perfil y cotizaciones; exige identidad del
-negocio y no combina fuentes locales. El prompt candidato está en
-`prompts/smarth_house_portal.md`. `prompts/sistema.md` y main siguen conservados.
-No confundir pruebas locales o lecturas de la API con entrega real por
-WhatsApp. El catálogo publicado, el estado real y los pendientes están en
-esa revisión; no recrear servicios, claves ni borrar memorias.
+**Continuación: leer primero
+[docs/despliegue-smarth-portal.md](docs/despliegue-smarth-portal.md).** Tiene
+commits, despliegues, pruebas, corrección de persistencia y respaldos
+restaurados. La [revisión previa](docs/revision-portal-smarth-house.md) es
+histórica: su autorización y migración pendientes ya fueron resueltas.
+No recrear servicios o claves ni borrar memorias. Faltan respaldos periódicos
+fuera del VPS y limitar el rol de la memoria heredada.
+
+**Respuestas progresivas:** saludo o “cómo funciona” no disparan toda la
+oferta. Precio consulta `ver_catalogo` sin foto; promociones o solicitud de
+imagen usan los adjuntos. Repreguntas breves, una invitación a demo y frase
+de traspaso literal. Las tarifas nuevas se publican en el portal, sin
+inventarlas en el prompt. Si una foto contiene precio, actualizarla también.
 
 - Cómo está hecho, cómo correrlo y qué falta (fases 2 y 3):
   [docs/portal.md](docs/portal.md).
@@ -152,10 +159,11 @@ Lo que importa acá es qué hace cada uno:
 | Archivo | Qué resuelve |
 |---|---|
 | `agente.py` | **El agente.** El grafo de LangGraph. Empezá por acá. |
-| `herramientas.py` | Lo que el agente puede hacer además de conversar. Hoy: el clima. |
+| `herramientas.py` | Herramienta general de clima; las del negocio dependen de configuración |
+| `portal.py` / `fuente_portal.py` | Herramientas del catálogo publicado y lectura autenticada del negocio |
 | `modelos.py` | Crea el modelo y le pregunta al proveedor cuáles tiene |
 | `memoria.py` | Los checkpointers: `ram` / `sqlite` / `postgres` |
-| `prompts.py` | Lee y guarda `prompts/sistema.md` |
+| `prompts.py` | Lee y guarda el prompt elegido por `PROMPT_SISTEMA` (sistema.md por defecto) |
 | `respuesta.py` | Parte una respuesta larga en varios mensajes |
 | `consola.py` | Que la terminal de Windows no rompa con las tildes |
 | `config.py` | Lee el `.env`. Única fuente de configuración. |
@@ -185,7 +193,9 @@ frontera es deliberada: es lo que permite agregar canales sin tocarlo.
 elige. Cambiar dónde se guardan las conversaciones no toca `agente.py`.
 
 **3. El prompt del sistema vive en un archivo, no en el código.**
-`prompts/sistema.md`, leído en **cada** mensaje (no una vez al arrancar).
+El archivo elegido por `PROMPT_SISTEMA`, leído en **cada** mensaje (no una vez
+al arrancar). Por defecto es `prompts/sistema.md`; Smarth House usa
+`prompts/smarth_house_portal.md`.
 Por eso se puede editar con el agente corriendo.
 
 **4. Toda la configuración sale del `.env`, vía `config.py`.**
@@ -200,7 +210,7 @@ Ninguna credencial en el código, ni una. Las claves se leen únicamente en
 |---|---|---|
 | Agregar un proveedor nuevo | `modelos.py` | Una rama en `crear_modelo()` + una en `listar_modelos()` |
 | Cambiar dónde se guardan las charlas | `.env` (`MODO`) | O una función nueva en `memoria.py` |
-| Cambiar la personalidad | `prompts/sistema.md` | Es texto plano |
+| Cambiar la personalidad | Archivo elegido por `PROMPT_SISTEMA` | Es texto plano; verificar el destino |
 | **Agregar herramientas** | `herramientas.py` | Una función con `@tool` + sumarla a `HERRAMIENTAS`. El grafo ya está armado. |
 | Agregar un canal (Telegram, WhatsApp) | archivo nuevo | Traducir mensaje entrante → `agente.responder(texto, conversacion=<chat_id>)` |
 | Nueva variable de configuración | `config.py` | Campo en `Config` + lectura en `desde_entorno()` + línea en `.env.example` |
@@ -369,7 +379,8 @@ Cosas que parecen bugs y no lo son, o que cuestan de encontrar:
 
 No lo agregues salvo que te lo pidan: son los próximos videos de la serie.
 
-- Más herramientas (hay una sola: el clima)
+- Más herramientas generales. Las herramientas comerciales de catálogo ya
+  se implementaron por pedido del usuario; ver el estado de producción arriba.
 - RAG / base de conocimiento
 - Autenticación en la plataforma de pruebas (es local, un solo usuario)
 - Varias conversaciones en paralelo en la web (usa un `thread_id` fijo)

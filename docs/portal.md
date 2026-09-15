@@ -1,16 +1,14 @@
 # Portal de catálogos — `catalogos.automaticnic.online`
 
-> **Estado al 14/09/2026: desplegado en producción y con el código del lado
-> del bot ya escrito y probado.** Falta conectar Smarth House de punta a
-> punta: `agente-ia` y `bot-demo` siguen sin cambios, y `prompts/sistema.md`
-> sigue con el precio y la fecha escritos a mano. Ver «Fase 3» más abajo
-> para el estado exacto y lo que falta.
+> **Estado al 14/09/2026: portal conectado con Smarth House en producción.**
+> `agente-ia` ejecuta la integración desde `main`, con el prompt
+> `prompts/smarth_house_portal.md` y la oferta publicada. Ya envía fotos por
+> WhatsApp. `bot-demo` conserva la demo de uniformes.
 
-**La revisión más reciente está en
-[revision-portal-smarth-house.md](revision-portal-smarth-house.md).** Sustituye
-las referencias iniciales a catálogo vacío o consumidor limitado a promociones.
-La oferta ya está publicada; el consumidor completo está probado localmente.
-El bot que atiende la campaña sigue pendiente de migración y despliegue.
+**El registro actual está en
+[despliegue-smarth-portal.md](despliegue-smarth-portal.md).** Incluye la
+corrección del almacenamiento persistente real, respaldos restaurados,
+despliegues y alcance de pruebas. La revisión anterior queda como historial.
 
 Las decisiones de negocio están en
 [la metodología](metodologia-clientes.md#portal-del-catálogo-y-separación-entre-negocios).
@@ -87,9 +85,14 @@ Desplegado el 14/09/2026:
 | App en Coolify | `portal-catalogos`, uuid `vhvndsnvosry83dqlztwontm`, rama `portal` |
 | Imagen | `Dockerfile.portal` (no el `Dockerfile` del agente) |
 | Base | `catalogos`, rol `portal_catalogos`, mismo PostgreSQL de las memorias |
-| Fotos | Volumen Docker `portal_datos` en `/app/datos/portal` (vía `custom_docker_run_options`, no hay volumen persistente propio en la API de Coolify que se haya usado) |
+| Fotos | Bind mount de `/data/coolify/applications/vhvndsnvosry83dqlztwontm/catalogo-fotos` a `/app/datos/portal`, registrado en Coolify y verificado en el contenedor |
 | Despliegue automático | Apagado, igual que `bot-demo` |
 | Negocios cargados | `smarth-house`, oferta y «Mi negocio» publicados; revisión de la conexión en el documento enlazado arriba |
+
+**Corrección del 14/09:** el despliegue original no tenía montajes, aunque
+la documentación afirmaba que había un volumen Docker. Se respaldaron las
+fotos antes de reiniciar y se configuró el bind mount anterior. La publicación
+y las imágenes se verificaron después del despliegue; no recrear el almacén.
 
 **Antes de tocar esto:** confirmar rama y que no haya cambios locales sin
 commit, y recordar que ahora sí es producción — no es la base de pruebas
@@ -203,8 +206,8 @@ Qué trae:
   `PORTAL_PRUEBAS_DSN`. Las pruebas solo aceptan la base `catalogos_pruebas`
   y borran lo que crean.
 
-Verificación inicial del 14/09 (los resultados posteriores están en la
-[revisión de integración](revision-portal-smarth-house.md#evidencia-y-límites-de-las-pruebas)):
+Verificación inicial del 14/09 (los resultados posteriores están en el
+[registro de despliegue](despliegue-smarth-portal.md#comprobaciones)):
 
 - Suite completa: 358 aprobadas y 8 omitidas, las de PostgreSQL opcional.
 - Contrato contra `catalogos_pruebas`: 8 de 8.
@@ -262,8 +265,9 @@ Siguen pendientes:
 
 **Fase 2: publicarlo** (despliegue inicial completado el 14/09)
 
-La aplicación, la base y el volumen de esta lista ya existen; no recrearlos.
-El respaldo y su restauración siguen pendientes de verificación.
+La aplicación, la base y el almacenamiento persistente ya existen; no
+recrearlos. Los respaldos manuales de bases y fotos se restauraron y
+verificaron; faltan copias automáticas periódicas fuera del VPS.
 
 - `Dockerfile` propio del portal, o un CMD alternativo:
   - Mismo repositorio, puerto propio y health check a `/salud`.
@@ -282,7 +286,7 @@ El respaldo y su restauración siguen pendientes de verificación.
   - Versionar el esquema cuando cambie una tabla existente.
   - Cambiar la contraseña desde el portal.
 
-**Fase 3: Smarth House con el portal** (toca producción)
+**Fase 3: Smarth House con el portal** (desplegada el 14/09)
 
 - ✅ `src/agente/fuente_portal.py` consulta y valida la publicación. La caché
   se separa por URL, clave y negocio esperado; nunca se busca «la única
@@ -300,11 +304,15 @@ El respaldo y su restauración siguen pendientes de verificación.
 - ✅ Smarth House publicó PLAN-1 y Mi negocio. Se corrigieron tipo, unidad y
   descripción con confirmación del usuario; la clave de lectura ya existe.
   Su archivo local es `.env.bot-portal.local`, ignorado por Git y Docker.
-- ✅ El candidato completo está en `prompts/smarth_house_portal.md`.
-  `prompts/sistema.md` se conserva. La comparación está en la revisión.
-- ✅ Texto y foto verificados en una conversación sintética de la bandeja API
-  de Chatwoot (cuenta 2, bandeja 2, conversación 4). Falta probar el webhook
-  nuevo desplegado y la entrega por WhatsApp; esta prueba no los certifica.
-- ⏳ Con revisión del prompt y autorización del despliegue, llevar la versión
-  probada a `main`, configurar `agente-ia` y verificar salud, foto y traspaso
-  real. No fusionar ni desplegar automáticamente por haber completado tests.
+- ✅ El prompt activo está en `prompts/smarth_house_portal.md` y responde
+  progresivamente según la pregunta. `prompts/sistema.md` se conserva.
+- ✅ Recorrido completo del webhook en contenedor aislado, con Gemini y
+  Chatwoot cuenta 2, bandeja 3, conversación 5; foto comprobada por sus bytes.
+  El webhook temporal se retiró; la demo original siguió atendiendo.
+- ✅ Integración llevada a `main` y desplegada con autorización del usuario;
+  portal y bot sanos, huellas verificadas. Fotos leídas en las conversaciones
+  34 y 35 de WhatsApp que mostró el usuario.
+- ⏳ La redacción breve se probó en diez turnos aislados con Gemini y ya está
+  desplegada. El usuario decidió comprobarla en su teléfono más adelante.
+  El traspaso mantiene su frase y la automatización existente; no se forzó
+  un traspaso de un prospecto para probarlo.

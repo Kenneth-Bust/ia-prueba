@@ -37,7 +37,7 @@ Desde la raíz, en Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\desplegar.py comprobar
-.\.venv\Scripts\python.exe scripts\desplegar.py desplegar
+.\.venv\Scripts\python.exe scripts\desplegar.py desplegar --prompt prompts/smarth_house_portal.md
 ```
 
 Con un entorno virtual activado también sirve `python scripts/desplegar.py`.
@@ -56,9 +56,10 @@ Con un entorno virtual activado también sirve `python scripts/desplegar.py`.
   python scripts/desplegar.py estado ID_DEL_DESPLIEGUE --commit COMMIT_COMPLETO
   ```
 
-**Prompt alternativo.** Por defecto se verifica `prompts/sistema.md`. Para
-la migración de Smarth House, una vez aprobada y configurada su variable
-`PROMPT_SISTEMA`, se debe indicar el archivo esperado:
+**Prompt activo de Smarth House.** El valor predeterminado del script sigue
+siendo `prompts/sistema.md`, pero producción ya usa
+`PROMPT_SISTEMA=prompts/smarth_house_portal.md` desde el 14/09. Hay que indicar
+el archivo esperado tanto al desplegar como al continuar con `estado`:
 
 ```text
 python scripts/desplegar.py desplegar --prompt prompts/smarth_house_portal.md

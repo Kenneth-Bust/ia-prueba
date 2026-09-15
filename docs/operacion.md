@@ -19,7 +19,7 @@ administrado con **Coolify**. Al 11/09/2026: CPU 18 %, memoria 29 %, disco
 |---|---|---|
 | `agente-ia` | `agente.automaticnic.online` | Bot de la agencia (Smarth House). Rama `main`. |
 | `bot-demo` | `bot-demo.automaticnic.online` | Bot del piloto (Cliente Demo). Rama `piloto-demo`. |
-| `portal-catalogos` | `catalogos.automaticnic.online` | Catálogos por negocio. Rama `portal`; base y volumen propios. |
+| `portal-catalogos` | `catalogos.automaticnic.online` | Catálogos por negocio. Rama `portal`; base propia y fotos en bind mount persistente. |
 | `chatwoot` | `appchatwoot.automaticnic.online` | Una sola instalación, varias cuentas. |
 | Coolify | `appcoolify.automaticnic.online` | Panel. |
 | PostgreSQL | interno `1hrm4idgdx20aqz5grz12fqb` | Memorias de los bots. |
@@ -41,31 +41,32 @@ porque Coolify no tenía credenciales de GitHub y era el camino más corto. No
 contiene secretos: el `.env` está en `.gitignore` y las credenciales viven en
 las variables de entorno de Coolify.
 
-## Preparación de Smarth House para leer el portal — 14/09/2026
+## Smarth House conectado al portal — 14/09/2026
 
-La revisión y el contexto para continuar están en
-[revision-portal-smarth-house.md](revision-portal-smarth-house.md).
-El portal está publicado y la oferta de Smarth House quedó en versión 4,
-con tipo Promoción, US$45 al mes por número y la descripción confirmada por
-el usuario. No tiene un plan regular posterior: lo confirma el equipo.
+La integración ya está desplegada en `agente-ia` desde `main`, con
+`PROMPT_SISTEMA=prompts/smarth_house_portal.md`. Consulta el catálogo publicado
+y envía sus fotos por WhatsApp. `prompts/sistema.md` conserva el prompt
+anterior como referencia; ya no es el activo de la agencia.
 
-La integración ampliada y el prompt candidato
-`prompts/smarth_house_portal.md` están preparados en la rama `portal`.
-Pasaron pruebas locales, contrato PostgreSQL, Gemini y entrega de texto/foto
-en la cuenta 2, bandeja API 2, conversación sintética 4 de Chatwoot.
-**No se probó todavía su entrega por WhatsApp ni se desplegó esa integración.**
-`agente-ia` sigue en main con `prompts/sistema.md`; bot-demo sigue con
-uniformes. No se modificaron sus variables ni se borraron memorias.
+La oferta sigue en versión 4: Promoción, US$45 al mes por número, descripción
+aprobada y vigencia hasta el 11/10/2026. No hay un plan regular posterior:
+lo confirma el equipo. La clave `agente-ia-portal` ya está configurada en
+Coolify; no recrearla ni imprimirla. La demo de uniformes se conservó.
 
-La clave de lectura del negocio ya se creó y está en archivos locales
-ignorados. No está configurada en Coolify. No recrearla ni imprimirla.
-El autodespliegue observado estaba activo para agente-ia y desactivado para
-bot-demo y portal-catalogos; consultar de nuevo antes de subir cambios.
+El [registro de migración](despliegue-smarth-portal.md) documenta pruebas,
+despliegues, configuración, persistencia de fotos corregida y restauración
+de respaldos. La memoria y los identificadores de conversación se conservaron.
+Las respuestas ahora avanzan según la pregunta, sin enviar toda la oferta
+ante un saludo o una consulta general sobre cómo funciona.
 
-Se detectó que la memoria de agente-ia todavía usa el rol superusuario
-`postgres`. Preparar una migración a permisos limitados con respaldo e
-historial conservado; no cambiar el DSN del bot de la campaña por rutina.
-Los respaldos y una restauración no quedaron verificados en esta revisión.
+Pendientes operativos: respaldos periódicos fuera del VPS y migración de la
+memoria heredada, que todavía usa el superusuario `postgres`, a permisos
+limitados. Ya existe una copia manual restaurada y verificada; no cambiar
+el DSN del bot de la campaña por rutina.
+
+Para entrar a Coolify usá **https://appcoolify.automaticnic.online**. El
+certificado de origen y la redirección HTTP → HTTPS se verificaron. La IP
+`http://2.25.112.244:8000` sigue en HTTP y por eso muestra “No es seguro”.
 
 ## Cómo se reparte Chatwoot
 
@@ -77,12 +78,14 @@ Una instalación, una cuenta por negocio. El aislamiento es lógico, no físico.
 | Cliente Demo | 2 | API `Pruebas Demo` (ID 2) | `bot-demo` |
 
 **Qué separa a un bot de otro.** Cada bot tiene su `CHATWOOT_CUENTA_ID` y su
-`CHATWOOT_WEBHOOK_TOKEN`, y el del piloto además lleva `CHATWOOT_BANDEJA_ID`.
+`CHATWOOT_WEBHOOK_TOKEN` y `CHATWOOT_BANDEJA_ID`.
 El canal descarta cualquier evento de otra cuenta o bandeja **antes** de
 llamar al modelo: un evento cruzado no gasta tokens. Verificado en vivo.
 
-`agente-ia` corre `main`, que todavía **no** tiene ese filtro; su protección
-es el secreto del webhook. Cuando se mergee `piloto-demo` lo va a tener.
+`agente-ia` tiene los filtros activos para cuenta **1**, bandeja **1**.
+La cuenta 2 conserva además una bandeja API 3 y conversación sintética 5
+de la verificación del portal. Su webhook temporal se retiró; no confundirla
+con la bandeja 2 que atiende el piloto de uniformes.
 
 ## El traspaso a una persona, de punta a punta
 
@@ -98,7 +101,7 @@ el prospecto pide un asesor
   → asigna la conversación al usuario 1
 ```
 
-**Si se cambia esa frase en `prompts/sistema.md`, hay que cambiar también la
+**Si se cambia esa frase en el prompt activo (`prompts/smarth_house_portal.md`), hay que cambiar también la
 condición de la automatización**, o el traspaso deja de marcarse y nadie se
 entera. Están acopladas a propósito: es lo que evita programar una
 herramienta para que el bot etiquete.
@@ -191,17 +194,18 @@ Cosas que parecen bugs, no lo son, y cuestan horas de encontrar:
 
 ## La oferta comercial
 
-Enfoque comercial revisado y desplegado el 13/09/2026 en el bot de la agencia.
-La revisión, el ID de despliegue y la huella comprobada en `/salud` constan
+Enfoque comercial revisado el 13/09 y conectado al portal el 14/09/2026.
+Las revisiones, los ID de despliegue y las huellas comprobadas en `/salud` constan
 en el [registro de despliegues verificados](#registro-de-despliegues-verificados).
 
 | Concepto | Monto |
 |---|---|
-| Mensualidad, hasta 1.000 conversaciones | US$ 45 |
+| Promoción mensual por número, hasta 1.000 conversaciones | US$ 45 (publicación v4) |
 | Instalación | Propuesta que el dueño define con el prospecto en la demo |
 
-Tres usuarios del panel (uno administrador y dos que atienden), pago por
-transferencia BAC. El contrato de seis meses es el antecedente comercial
+El antecedente comercial contempla tres usuarios del panel (uno administrador
+y dos que atienden) y transferencia BAC; el bot informa alcance y formas de
+pago solo desde lo publicado. El contrato de seis meses es el antecedente comercial
 interno: este cambio no cancela contratos ni modifica acuerdos existentes.
 Las condiciones de contratación las explica y confirma personalmente el
 equipo; el bot no publica plazos de permanencia.
@@ -216,15 +220,28 @@ notificaciones al teléfono sigue pendiente, como se explica en el traspaso.
 
 La campaña tiene fecha límite publicada del **11 de octubre de 2026**. Para
 quienes contraten dentro de la promoción, **US$ 45 mensuales quedan fijos
-para siempre** en el plan de hasta 1.000 conversaciones. La primera
-explicación de precio confirma la mensualidad, la promoción por tiempo
-limitado, la fecha límite y el CRM, app para el celular, soporte y
-capacitación incluidos. Cierra con una invitación a coordinar una demo por
-videollamada, sin preguntar además el rubro o el volumen de mensajes. Si ya
-la ofreció, no insiste. Cada mención de tarifa fija o para siempre debe
+para siempre** en el plan de hasta 1.000 conversaciones, según la descripción
+aprobada. El bot consulta la publicación vigente antes de informar condiciones.
+La primera explicación de precio resume importe, unidad, límite, vigencia
+y hasta dos beneficios, sin volcar toda la descripción. La conservación de
+tarifa se amplía si preguntan por condiciones. Puede ofrecer una demo una
+vez, sin otra pregunta de calificación. Si ya la ofreció, no insiste.
+Cada mención de tarifa fija o para siempre debe
 llevar el límite de hasta 1.000 conversaciones por mes; los excesos se
 consultan, no generan cobros ni una pérdida permanente de la promoción
 inventados por el bot.
+
+Un saludo no dispara ofertas. Si preguntan “cómo funciona”, explica el
+servicio brevemente y pregunta el rubro si falta; no envía precio, foto y
+cierre comercial juntos. Las promociones disponibles o una solicitud de
+imagen sí reciben su foto. Las repreguntas consultan `ver_catalogo` sin
+reenviarla. Se prefieren 20–50 palabras, con más detalle cuando una
+cotización o varias preguntas lo exijan.
+
+Un cambio de tarifa se carga y **publica en el portal**, junto con una nueva
+foto si la anterior tiene el precio dibujado. No exige editar el prompt ni
+desplegar el bot. No se publicaron aumentos futuros ni vencimientos
+anticipados. Los acuerdos particulares existentes los confirma el equipo.
 
 **La presentación inicial ya no incluye instalación ni contrato.** Los
 US$ 150 de instalación y el total inicial de US$ 195 son referencias del
@@ -309,12 +326,35 @@ de Chatwoot. No guardar tokens en este documento ni pegarlos en un chat.
 Consultar la [documentación de despliegues de Coolify](https://coolify.io/docs/api/endpoints/deployments/deploy-by-tag-or-uuid)
 para el método y los permisos de la versión instalada.
 
-Al finalizar la campaña, revisar el prompt antes de seguir publicitando la
-oferta. El bot no dispone de una fecha actual confiable y no desactiva la
-promoción automáticamente; no cambiar la tarifa prometida a quienes ya
-contrataron dentro del plazo.
+Al finalizar la campaña, revisar la publicación antes de seguir publicitando.
+Las herramientas filtran la vigencia usando la fecha de Nicaragua; una
+promoción vencida deja de ofrecerse. Si no hay servicio regular publicado,
+el equipo confirma la tarifa. No cambiar acuerdos de quienes contrataron
+dentro del plazo ni reutilizar el precio del historial como oferta vigente.
 
 ## Registro de despliegues verificados
+
+### 14/09/2026 — Catálogo del portal, fotos y respuestas progresivas
+
+Integración inicial `45bdb54`, desplegada en agente-ia como
+`ispbjxswherbpqcqpy8kbhcc` y en portal-catalogos como
+`oh23cd5hq4gdsuvswowmn2gl`. Ajuste de conversación `aed3a69`, despliegue
+`r36z1nw75tsfvys4ykmz98m9`. Los tres finalizaron; salud comprobada.
+Suite del ajuste: **405 aprobadas, 8 omitidas**, con modelos falsos.
+
+Prompt activo: `prompts/smarth_house_portal.md`, huella
+`1f32fe5efcd5b56552c392839c2c551ba21867c7c80e8ce9b718c9b39f1ea3f2`.
+Reglas del catálogo:
+`65deb39cd50609b4bd9c4f497148f9602d3e70b05b9b56ab7995184c2bdb7a54`.
+`catalogo_fuente: portal`. El piloto sigue sano y sin despliegue nuevo.
+
+Diez turnos aislados con Gemini verificaron las respuestas breves; el
+recorrido desplegado se probó antes en la cuenta 2. Las fotos de las
+conversaciones 34 y 35 indicadas por el usuario figuran leídas por WhatsApp.
+No se borraron memorias. Se corrigió el almacenamiento real de fotos y se
+restauraron copias de las bases y los archivos. Alcance, identificadores,
+autodespliegue y pendientes en
+[despliegue-smarth-portal.md](despliegue-smarth-portal.md).
 
 ### 13/09/2026 — Demo por videollamada y app para el celular
 
@@ -365,20 +405,18 @@ operar, comprobá el estado real en Coolify y la huella del prompt.
   nadie puede recuperar su contraseña y no salen notificaciones. Hoy los
   usuarios se crean por API o desde Super Admin, fijando la contraseña a mano.
 
-- **El Postgres no tiene backups automáticos.** Todas las memorias de todos
-  los clientes están en un servidor sin copia. Hostinger ofrece backups
-  diarios por unos US$ 6/mes.
+- **Faltan backups automáticos fuera del VPS.** El 14/09 se respaldaron y
+  restauraron memoria de la agencia, catálogo y fotografías, con copia en
+  esta PC. Es una copia manual, no una política periódica para todos los
+  clientes. Ver el registro de migración antes de tocar esas copias.
 
-- **`MAX_TOKENS=512` en `bot-demo` corta las respuestas a mitad de frase.**
-  Está bajo a propósito para el piloto. Un cliente real necesita 4096.
+- **Verificar límites del modelo por aplicación.** El piloto ya tiene
+  `MAX_TOKENS=4096` (comprobado el 14/09); el valor 512 documentado antes era
+  histórico. El tope no sustituye probar respuestas y costos con cada negocio.
 
-- **El bot de la agencia todavía no envía imágenes.** `agente-ia` corre
-  `main`, que solo responde texto: si alguien pide ver algo, promete fotos
-  que nunca llegan, y eso ya costó ventas en pruebas reales. El envío de
-  fotos aprobadas existe en `piloto-demo` y corre en `bot-demo` desde el
-  14/09/2026 ([plan de la demo](demo-uniformes-plan.md)). Falta llevarlo a
-  `main`; el usuario decidió que la promo de Smarth House espere al portal
-  de catálogos.
+- **Migrar los permisos de la memoria heredada.** El bot de Smarth House
+  todavía conecta como superusuario. Hacer una migración específica, con
+  copia y comprobación del historial, antes de afirmar aislamiento completo.
 
 - **Un solo VPS.** Compartir servidor implica compartir capacidad y caídas.
 
@@ -402,6 +440,11 @@ El molde, ya validado con el piloto:
    bandeja dentro de **su** cuenta.
 8. **Verificá el aislamiento** antes de entregar: que un usuario suyo reciba
    401 al pedir otra cuenta, y que un evento de otra cuenta se descarte.
+9. **Catálogo del negocio**: alta y accesos en el portal compartido, clave
+   de lectura propia, datos y fotos publicados. Configurar `PORTAL_URL`,
+   `PORTAL_CLAVE_BOT`, `PORTAL_NEGOCIO_ID` y, si corresponde, `PORTAL_LINEA`.
+   Usar un prompt que consulte herramientas y comprobar precio y foto desde
+   su bandeja. No copiar la identidad, clave o memoria de Smarth House.
 
 ## Documentos relacionados
 

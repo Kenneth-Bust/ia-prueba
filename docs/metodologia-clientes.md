@@ -16,16 +16,21 @@ repetir cada corrección en todas las ramas. Durante la transición actual:
 
 - `main` es la versión desplegada para Smarth House. No modificarla ni
   desplegarla como parte de un trabajo para otro cliente.
-- `piloto-demo` es el lugar autorizado para construir y comprobar la nueva
-  capacidad de catálogos, cotizaciones, fotografías y varias bandejas.
-- `portal` contiene el portal compartido y la integración que se está
-  preparando para Smarth House. No es otra rama permanente por cliente.
-- Cuando la capacidad esté probada, se prepara una versión común estable.
-  Cada cliente la ejecutará en una aplicación separada con sus propios datos.
+- `piloto-demo` conserva la demo de uniformes y su aplicación aislada.
+- `portal` es la rama desde la que se despliega el portal compartido. No es
+  otra rama permanente por cliente.
+- `main` ya incorpora herramientas de catálogo, cotización, envío de fotos
+  y filtros de cuenta/bandeja. Smarth House ejecuta esa capacidad desde el
+  14/09. Los nuevos clientes reutilizan el código en aplicaciones separadas
+  con sus propios datos, después de comprobar su configuración y operación.
 
 Dos números de un mismo negocio no requieren dos ramas ni dos catálogos.
 Son dos bandejas de WhatsApp dentro de la cuenta de ese negocio. La
 configuración decide qué categorías atiende cada bandeja.
+Hoy cada aplicación configura una bandeja y una `PORTAL_LINEA`: si los dos
+números necesitan líneas diferentes, preparar dos aplicaciones con memoria
+propia y el mismo negocio de catálogo. El enrutamiento dinámico de varias
+bandejas dentro de un único proceso todavía no está implementado.
 
 ## Aislamiento mínimo por cliente
 
@@ -92,11 +97,10 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 
 ## Portal del catálogo y separación entre negocios
 
-> **Estado actualizado:** el portal está desplegado, con base y volumen
-> propios. Smarth House ya publicó su oferta. La conexión ampliada del bot
-> está preparada en la rama `portal`; el bot de la campaña todavía usa
-> `main`. La evidencia y los pasos restantes están en
-> [revision-portal-smarth-house.md](revision-portal-smarth-house.md).
+> **Estado al 14/09:** portal desplegado, con base propia y fotografías en
+> un bind mount persistente verificado. Smarth House ya publicó su oferta
+> y su bot en `main` está conectado al portal. La evidencia y los pendientes
+> operativos están en [despliegue-smarth-portal.md](despliegue-smarth-portal.md).
 >
 > Decisiones que tomó el usuario ese día:
 >
@@ -104,8 +108,8 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 >   demás clientes.
 > - Una sola URL para todos los negocios.
 > - Usuarios propios del portal, no las cuentas de Chatwoot.
-> - La imagen de la promoción de Smarth House espera al portal; no se
->   publica antes con el catálogo en archivo.
+> - La imagen de Smarth House se entrega desde el portal publicado, no desde
+>   un archivo de catálogo en el repositorio.
 > - Además del catálogo, el portal tiene **«Mi negocio»**: datos generales,
 >   dirección, horarios, formas de pago aceptadas, envíos, políticas y
 >   preguntas frecuentes. El bot la lee de lo publicado, igual que el

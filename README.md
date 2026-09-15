@@ -1,5 +1,14 @@
 # AgentKit
 
+**Este repositorio también atiende WhatsApp real en producción.** Smarth
+House ejecuta `main` con `prompts/smarth_house_portal.md`, consulta su catálogo
+publicado y envía fotos. Antes de cambiar o desplegar esa aplicación, leé
+[operación](docs/operacion.md) y el
+[registro de actualización](docs/despliegue-smarth-portal.md). Para incorporar
+clientes usá la [metodología común](docs/metodologia-clientes.md): configuración
+y datos propios, sin una rama permanente por cliente. Las instrucciones
+locales siguientes describen la base de AgentKit.
+
 Para preparar una segunda marca separada de tu agencia, seguí la
 [guía del piloto Cliente Demo](docs/piloto-demo.md). Incluye la configuración
 de Chatwoot, la memoria independiente y el despliegue en Coolify.
