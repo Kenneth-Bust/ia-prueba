@@ -45,3 +45,6 @@ _vista-previa.html
 
 # Credenciales generadas para el portal de catálogos (usuarios y claves de bot)
 .credenciales-*.local
+
+# Copias privadas de los catálogos descargados por cada bot.
+recursos/_portal_cache/

@@ -18,6 +18,8 @@ repetir cada corrección en todas las ramas. Durante la transición actual:
   desplegarla como parte de un trabajo para otro cliente.
 - `piloto-demo` es el lugar autorizado para construir y comprobar la nueva
   capacidad de catálogos, cotizaciones, fotografías y varias bandejas.
+- `portal` contiene el portal compartido y la integración que se está
+  preparando para Smarth House. No es otra rama permanente por cliente.
 - Cuando la capacidad esté probada, se prepara una versión común estable.
   Cada cliente la ejecutará en una aplicación separada con sus propios datos.
 
@@ -90,10 +92,11 @@ Así un cambio posterior del catálogo no modifica una cotización ya emitida.
 
 ## Portal del catálogo y separación entre negocios
 
-> **Estado al 14/09/2026: fase 1 construida en la rama `portal`, solo en
-> local** (ver [portal.md](portal.md)). No hay aplicación en Coolify ni base
-> de producción, y ningún bot lo lee todavía. El DNS `catalogos` ya apunta
-> al servidor.
+> **Estado actualizado:** el portal está desplegado, con base y volumen
+> propios. Smarth House ya publicó su oferta. La conexión ampliada del bot
+> está preparada en la rama `portal`; el bot de la campaña todavía usa
+> `main`. La evidencia y los pasos restantes están en
+> [revision-portal-smarth-house.md](revision-portal-smarth-house.md).
 >
 > Decisiones que tomó el usuario ese día:
 >

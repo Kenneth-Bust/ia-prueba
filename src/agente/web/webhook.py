@@ -185,7 +185,7 @@ def crear_app(
         # Identifica el texto efectivo sin publicarlo. Se relee igual que
         # en cada mensaje, para detectar un deploy con el prompt anterior.
         prompt = leer_prompt(config.prompt_sistema)
-        return {
+        resultado = {
             "estado": "ok",
             "proveedor": config.proveedor,
             "modelo": config.modelo,
@@ -194,6 +194,14 @@ def crear_app(
             "respuesta_minima_segundos": config.respuesta_minima_segundos,
             "buffer_segundos": config.buffer_segundos,
         }
+        if config.portal_url:
+            from ..portal import REGLA_CATALOGO
+
+            resultado["catalogo_fuente"] = "portal"
+            resultado["reglas_catalogo_sha256"] = hashlib.sha256(
+                REGLA_CATALOGO.encode("utf-8")
+            ).hexdigest()
+        return resultado
 
     @app.post("/chatwoot/{token}")
     async def entrante(token: str, pedido: Request) -> JSONResponse:

@@ -147,7 +147,17 @@ def iniciar(config: ConfigDespliegue) -> str:
     return identificador
 
 
-def estado(config: ConfigDespliegue, identificador: str, revision: str) -> str:
+def validar_prompt(ruta: str) -> str:
+    if not re.fullmatch(r"prompts/[A-Za-z0-9_-]+\.md", ruta):
+        raise ErrorDespliegue("--prompt debe ser un archivo .md dentro de prompts/.")
+    return ruta
+
+
+def estado(
+    config: ConfigDespliegue, identificador: str, revision: str,
+    prompt: str = "prompts/sistema.md",
+) -> str:
+    validar_prompt(prompt)
     if not re.fullmatch(r"[A-Za-z0-9_-]+", identificador):
         raise ErrorDespliegue("Identificador de despliegue inválido.")
     if not re.fullmatch(r"[a-fA-F0-9]{40}", revision):
@@ -163,7 +173,7 @@ def estado(config: ConfigDespliegue, identificador: str, revision: str) -> str:
             raise ErrorDespliegue("El commit desplegado no coincide con el esperado.")
         # Se compara con el archivo de ESE commit, aunque otro agente ya haya
         # empezado a trabajar en una revisión posterior del repositorio.
-        texto = git("show", f"{revision}:prompts/sistema.md")
+        texto = git("show", f"{revision}:{prompt}")
         esperado = hashlib.sha256(texto.encode("utf-8")).hexdigest()
         salud = pedir(SALUD)
         if salud.get("estado") != "ok" or salud.get("prompt_sha256") != esperado:
@@ -176,11 +186,16 @@ def main(argumentos=None) -> int:
     parser.add_argument("accion", choices=("comprobar", "desplegar", "estado"))
     parser.add_argument("identificador", nargs="?")
     parser.add_argument("--commit", default="")
+    parser.add_argument(
+        "--prompt", default="prompts/sistema.md",
+        help="Prompt esperado en ese commit. No cambia las variables de Coolify.",
+    )
     args = parser.parse_args(argumentos)
     try:
+        validar_prompt(args.prompt)
         config = ConfigDespliegue.desde_entorno()
         if args.accion == "estado":
-            actual = estado(config, args.identificador or "", args.commit)
+            actual = estado(config, args.identificador or "", args.commit, args.prompt)
             print(f"Estado: {actual}")
             return 0 if actual in ("finished", "success") else 2
 
@@ -196,12 +211,14 @@ def main(argumentos=None) -> int:
             raise ErrorDespliegue("Las pruebas fallaron. No se desplegó nada.")
         if comprobar_revision() != revision:
             raise ErrorDespliegue("El código cambió durante las pruebas. Volvé a comprobarlo.")
+        # Un nombre válido pero ausente debe fallar antes de iniciar el deploy.
+        git("show", f"{revision}:{args.prompt}")
         identificador = iniciar(config)
         print(f"Despliegue aceptado: {identificador}", flush=True)
-        print(f"Para seguirlo: python scripts/desplegar.py estado {identificador} --commit {revision}", flush=True)
+        print(f"Para seguirlo: python scripts/desplegar.py estado {identificador} --commit {revision} --prompt {args.prompt}", flush=True)
         anterior = None
         for _ in range(30):
-            actual = estado(config, identificador, revision)
+            actual = estado(config, identificador, revision, args.prompt)
             if actual != anterior:
                 print(f"Estado: {actual}", flush=True)
                 anterior = actual

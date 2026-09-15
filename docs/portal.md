@@ -6,6 +6,12 @@
 > sigue con el precio y la fecha escritos a mano. Ver «Fase 3» más abajo
 > para el estado exacto y lo que falta.
 
+**La revisión más reciente está en
+[revision-portal-smarth-house.md](revision-portal-smarth-house.md).** Sustituye
+las referencias iniciales a catálogo vacío o consumidor limitado a promociones.
+La oferta ya está publicada; el consumidor completo está probado localmente.
+El bot que atiende la campaña sigue pendiente de migración y despliegue.
+
 Las decisiones de negocio están en
 [la metodología](metodologia-clientes.md#portal-del-catálogo-y-separación-entre-negocios).
 Este documento explica cómo está hecho y cómo seguirlo.
@@ -83,7 +89,7 @@ Desplegado el 14/09/2026:
 | Base | `catalogos`, rol `portal_catalogos`, mismo PostgreSQL de las memorias |
 | Fotos | Volumen Docker `portal_datos` en `/app/datos/portal` (vía `custom_docker_run_options`, no hay volumen persistente propio en la API de Coolify que se haya usado) |
 | Despliegue automático | Apagado, igual que `bot-demo` |
-| Negocios cargados | `smarth-house` (vacío: sin catálogo ni «Mi negocio» todavía) |
+| Negocios cargados | `smarth-house`, oferta y «Mi negocio» publicados; revisión de la conexión en el documento enlazado arriba |
 
 **Antes de tocar esto:** confirmar rama y que no haya cambios locales sin
 commit, y recordar que ahora sí es producción — no es la base de pruebas
@@ -197,7 +203,8 @@ Qué trae:
   `PORTAL_PRUEBAS_DSN`. Las pruebas solo aceptan la base `catalogos_pruebas`
   y borran lo que crean.
 
-Verificado el 14/09:
+Verificación inicial del 14/09 (los resultados posteriores están en la
+[revisión de integración](revision-portal-smarth-house.md#evidencia-y-límites-de-las-pruebas)):
 
 - Suite completa: 358 aprobadas y 8 omitidas, las de PostgreSQL opcional.
 - Contrato contra `catalogos_pruebas`: 8 de 8.
@@ -253,7 +260,10 @@ Siguen pendientes:
 6. **Fuera del portal por ahora:** agenda de citas, reservas y cupos. Es otro
    producto, conectado a un calendario.
 
-**Fase 2: publicarlo** (requiere el OK del usuario)
+**Fase 2: publicarlo** (despliegue inicial completado el 14/09)
+
+La aplicación, la base y el volumen de esta lista ya existen; no recrearlos.
+El respaldo y su restauración siguen pendientes de verificación.
 
 - `Dockerfile` propio del portal, o un CMD alternativo:
   - Mismo repositorio, puerto propio y health check a `/salud`.
@@ -274,37 +284,27 @@ Siguen pendientes:
 
 **Fase 3: Smarth House con el portal** (toca producción)
 
-- ✅ **`src/agente/portal.py`**: el bot pide `/api/bot/catalogo` con su
-  clave, filtra los ítems `tipo == "promocion"` vigentes, y arma el mismo
-  texto + adjunto que ya sabe mandar `agente.py`. Reusa `imagen_aprobada`
-  indirectamente: valida tamaño y firma de la foto igual que
-  `promociones.py`, y la cachea en disco por sha256 para no volver a
-  pedirla. Si el portal no contesta, sigue con la última copia guardada
-  (`recursos/_portal_cache/<negocio>/`); esa carpeta no sobrevive un
-  redeploy (se copia una sola vez al construir la imagen), alcanza para una
-  caída de minutos, no de días.
-- ✅ **Config y herramientas**: `PORTAL_URL` + `PORTAL_CLAVE_BOT` en
-  `Config`. `herramientas_para()` arma `promociones_disponibles` con el
-  portal como fuente si están cargadas las dos; si no, sigue con
-  `PROMOCIONES_RUTA` exactamente como antes. **No se tocó** `catalogo.py`:
-  la demo de uniformes (`bot-demo`) sigue leyendo su JSON, sin cambios.
-- ✅ Probado con un HTTP falso (sin red): vigencia, promoción sin precio,
-  falla del portal con y sin copia de respaldo, foto con firma inválida,
-  no repetir la descarga de una foto ya cacheada. 12 pruebas nuevas, y las
-  377 del proyecto siguen pasando.
-- ⏳ **`prompts/sistema.md` sigue con el precio y la fecha escritos a
-  mano** (US$ 45, 11 de octubre de 2026). Migrarlo para que dependa del
-  resultado de la herramienta es un cambio de contenido, no de código: hay
-  que revisar la redacción exacta antes de tocar el prompt que vende de
-  verdad. Nada de esto se aplica sin que el usuario vea el antes/después.
-- ⏳ **Falta cargar el catálogo real de Smarth House** en el portal (el
-  usuario entra con su cuenta y lo hace él mismo) y crear la clave del bot
-  con `scripts/portal_admin.py clave-bot --negocio smarth-house --nombre
-  agente-ia` (queda en `.credenciales-portal.local`, nunca en el repo).
-- ⏳ **Probar de punta a punta en `bot-demo` antes de tocar `agente-ia`**:
-  apuntar `bot-demo` a `PORTAL_URL`/`PORTAL_CLAVE_BOT` de smarth-house (o de
-  un negocio de prueba), confirmar que la foto y el precio llegan bien por
-  Chatwoot, y recién con eso desplegar a `agente-ia`, con el OK del usuario.
-- ⏳ El envío de fotos hoy vive en `piloto-demo` (de donde sale la rama
-  `portal`); llevarlo a `main` es un paso aparte y también necesita probarse
-  en `bot-demo` primero.
+- ✅ `src/agente/fuente_portal.py` consulta y valida la publicación. La caché
+  se separa por URL, clave y negocio esperado; nunca se busca «la única
+  carpeta que haya». Solo se usa hasta cinco minutos ante fallos transitorios,
+  y nunca para calcular una cotización nueva. Los rechazos de credenciales
+  invalidan la copia. Las descargas verifican tamaño, firma y SHA-256.
+- ✅ `src/agente/portal.py` consulta promociones, productos, servicios, perfil
+  y fotos; calcula opciones, extras y descuentos con Decimal. Si no hay
+  promoción, muestra servicios regulares publicados. Si no hay ninguno,
+  confirma con una persona, según decisión del usuario.
+- ✅ La configuración exige `PORTAL_URL`, `PORTAL_CLAVE_BOT` y
+  `PORTAL_NEGOCIO_ID`. `PORTAL_LINEA` es obligatorio si se publicaron líneas
+  del negocio. No combina estas fuentes con `CATALOGO_RUTA` o
+  `PROMOCIONES_RUTA`. El piloto de uniformes mantiene su fuente local.
+- ✅ Smarth House publicó PLAN-1 y Mi negocio. Se corrigieron tipo, unidad y
+  descripción con confirmación del usuario; la clave de lectura ya existe.
+  Su archivo local es `.env.bot-portal.local`, ignorado por Git y Docker.
+- ✅ El candidato completo está en `prompts/smarth_house_portal.md`.
+  `prompts/sistema.md` se conserva. La comparación está en la revisión.
+- ✅ Texto y foto verificados en una conversación sintética de la bandeja API
+  de Chatwoot (cuenta 2, bandeja 2, conversación 4). Falta probar el webhook
+  nuevo desplegado y la entrega por WhatsApp; esta prueba no los certifica.
+- ⏳ Con revisión del prompt y autorización del despliegue, llevar la versión
+  probada a `main`, configurar `agente-ia` y verificar salud, foto y traspaso
+  real. No fusionar ni desplegar automáticamente por haber completado tests.

@@ -142,6 +142,28 @@ def test_un_deploy_fallido_no_se_confunde_con_servicio_viejo_sano(monkeypatch):
     assert len(llamadas) == 1
 
 
+def test_verifica_el_prompt_alternativo_del_commit(monkeypatch):
+    def pedir(url, token=""):
+        if url == d.SALUD:
+            return {"estado": "ok", "prompt_sha256": hashlib.sha256(b"portal").hexdigest()}
+        return {"deployment_uuid": "prueba123", "status": "finished", "commit": REVISION}
+
+    def git(*args):
+        assert args == ("show", f"{REVISION}:prompts/smarth_house_portal.md")
+        return "portal"
+
+    monkeypatch.setattr(d, "pedir", pedir)
+    monkeypatch.setattr(d, "git", git)
+    assert d.estado(CONFIG, "prueba123", REVISION, "prompts/smarth_house_portal.md") == "finished"
+
+
+@pytest.mark.parametrize("ruta", [".env", "prompts/../.env", "C:/sistema.md", "prompts/a.md:otra"])
+def test_rechaza_un_prompt_fuera_del_directorio_esperado(ruta, monkeypatch):
+    monkeypatch.setattr(d, "pedir", lambda *args: pytest.fail("No debe llamar a Coolify"))
+    with pytest.raises(d.ErrorDespliegue, match="--prompt"):
+        d.estado(CONFIG, "prueba123", REVISION, ruta)
+
+
 def test_no_expone_secretos_del_cuerpo_de_error(monkeypatch):
     class Cliente:
         def open(self, pedido, timeout):

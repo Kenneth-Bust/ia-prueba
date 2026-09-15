@@ -33,7 +33,7 @@ from pathlib import Path
 from langchain_core.tools import tool
 
 from .catalogo import crear_herramientas_catalogo
-from .portal import crear_herramienta_promociones_portal
+from .portal import crear_herramientas_portal
 from .promociones import crear_herramienta_promociones
 
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
@@ -127,15 +127,20 @@ def herramientas_para(
     ruta_catalogo: Path | None = None,
     portal_url: str = "",
     portal_clave_bot: str = "",
+    portal_negocio_id: str = "",
+    portal_linea: str = "",
 ) -> list:
     """Herramientas comunes más las de catálogo habilitadas para este bot.
 
-    Si hay portal configurado, las promociones vienen de ahí y no del
-    archivo: son dos fuentes de la misma herramienta, nunca las dos juntas.
+    Si hay portal configurado, todo el catálogo viene de ahí. No se registran
+    herramientas locales de otro negocio aunque el llamador les pase rutas.
     """
     disponibles = list(HERRAMIENTAS)
     if portal_url and portal_clave_bot:
-        disponibles.append(crear_herramienta_promociones_portal(portal_url, portal_clave_bot))
+        disponibles.extend(crear_herramientas_portal(
+            portal_url, portal_clave_bot, negocio_id=portal_negocio_id, linea=portal_linea,
+        ))
+        return disponibles
     elif ruta_promociones is not None:
         disponibles.append(crear_herramienta_promociones(ruta_promociones))
     if ruta_catalogo is not None:

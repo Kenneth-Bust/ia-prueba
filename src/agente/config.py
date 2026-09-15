@@ -6,8 +6,10 @@ Todo sale del archivo .env. Nada de credenciales escritas en el código.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import dotenv_values, load_dotenv
 
@@ -107,12 +109,36 @@ class Config:
     # Catálogo de productos con fotos y cotizador (catalogo.py). Igual que el
     # de promociones: vacío deja al bot sin esas herramientas.
     catalogo_ruta: Path | None = None
-    # El portal de catálogos (docs/portal.md), como fuente de promociones en
-    # vez del archivo de promociones_ruta. Los dos vacíos: el bot sigue sin
-    # esa herramienta. Los dos a la vez no tiene sentido; si se cargan ambos,
-    # gana el portal (ver herramientas_para).
+    # Fuente única por aplicación: evita combinar el catálogo de la demo
+    # con la oferta real del negocio que autoriza esta clave.
     portal_url: str = ""
     portal_clave_bot: str = field(default="", repr=False)
+    portal_negocio_id: str = ""
+    portal_linea: str = ""
+
+    def __post_init__(self):
+        if any((self.portal_url, self.portal_clave_bot, self.portal_negocio_id, self.portal_linea)):
+            if not all((self.portal_url, self.portal_clave_bot, self.portal_negocio_id)):
+                raise ErrorDeConfiguracion(
+                    "Configurá juntos PORTAL_URL, PORTAL_CLAVE_BOT y PORTAL_NEGOCIO_ID."
+                )
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,40}", self.portal_negocio_id):
+                raise ErrorDeConfiguracion("PORTAL_NEGOCIO_ID no es un identificador válido.")
+            if self.portal_linea and not re.fullmatch(r"[a-z0-9_]{1,40}", self.portal_linea):
+                raise ErrorDeConfiguracion("PORTAL_LINEA no es un código válido.")
+            origen = urlsplit(self.portal_url)
+            if (
+                not origen.hostname or origen.username or origen.password
+                or origen.query or origen.fragment or origen.path.rstrip("/")
+                or (origen.scheme != "https" and not (
+                    origen.scheme == "http" and origen.hostname in ("localhost", "127.0.0.1", "::1")
+                ))
+            ):
+                raise ErrorDeConfiguracion("PORTAL_URL debe ser un origen HTTPS sin ruta ni credenciales.")
+            if self.catalogo_ruta or self.promociones_ruta:
+                raise ErrorDeConfiguracion(
+                    "Al conectar el portal, dejá CATALOGO_RUTA y PROMOCIONES_RUTA vacíos."
+                )
 
     @classmethod
     def desde_entorno(
@@ -187,6 +213,8 @@ class Config:
             catalogo_ruta=_ruta_catalogo_opcional("CATALOGO_RUTA"),
             portal_url=(os.getenv("PORTAL_URL") or "").strip().rstrip("/"),
             portal_clave_bot=(os.getenv("PORTAL_CLAVE_BOT") or "").strip(),
+            portal_negocio_id=(os.getenv("PORTAL_NEGOCIO_ID") or "").strip(),
+            portal_linea=(os.getenv("PORTAL_LINEA") or "").strip(),
         )
 
 

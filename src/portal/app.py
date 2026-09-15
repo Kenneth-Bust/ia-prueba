@@ -374,6 +374,8 @@ def crear_app(
 
     @app.get("/api/fotos/{foto_id}")
     def ver_foto(foto_id: str, sesion: Sesion) -> Response:
+        if sesion["rol"] != "administrador":
+            exigir_foto_publicada(sesion["cliente_id"], foto_id)
         return respuesta_de_foto(sesion["cliente_id"], foto_id)
 
     # -- Publicar ---------------------------------------------------------------------------
@@ -424,6 +426,16 @@ def crear_app(
 
     # -- Para los bots ------------------------------------------------------------------------
 
+    def exigir_foto_publicada(cliente_id: str, foto_id: str) -> None:
+        ultima = repo.ultima_publicacion(cliente_id)
+        ids = {
+            foto["id"]
+            for item in (ultima["contenido"]["items"] if ultima else [])
+            for foto in item.get("fotos", [])
+        }
+        if foto_id not in ids:
+            raise HTTPException(404, "Esa foto no está publicada.")
+
     @app.get("/api/bot/catalogo")
     def catalogo_para_bot(request: Request, cliente_id: Annotated[str, Depends(negocio_del_bot)]) -> Response:
         ultima = repo.ultima_publicacion(cliente_id)
@@ -440,6 +452,7 @@ def crear_app(
 
     @app.get("/api/bot/fotos/{foto_id}")
     def foto_para_bot(foto_id: str, cliente_id: Annotated[str, Depends(negocio_del_bot)]) -> Response:
+        exigir_foto_publicada(cliente_id, foto_id)
         return respuesta_de_foto(cliente_id, foto_id)
 
     return app

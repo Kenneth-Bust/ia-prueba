@@ -81,7 +81,7 @@ la conversación ni el texto libre de Gemini como fuente del catálogo.
 
 ### Trabajo próximo: demo de uniformes y sublimación
 
-El usuario pidió preparar la demo en **esta rama `piloto-demo`**, con
+El usuario pidió preparar la demo en **la rama `piloto-demo`**, con
 catálogo, precios e imágenes ficticios, cotización automática y traspaso
 humano para trabajos a medida. El plan y el estado para continuar están en
 [docs/demo-uniformes-plan.md](docs/demo-uniformes-plan.md); leelo antes de
@@ -97,6 +97,16 @@ escrito y probado, pero **todavía no conectado**: `agente-ia` sigue
 atendiendo con `prompts/sistema.md` como hasta ahora. Sirve para
 **cualquier rubro** y empieza por Smarth House.
 
+**Continuación de la conexión Smarth House:** leer
+[docs/revision-portal-smarth-house.md](docs/revision-portal-smarth-house.md).
+La rama actual de ese trabajo es **portal**. El nuevo consumidor consulta
+productos, servicios, promociones, perfil y cotizaciones; exige identidad del
+negocio y no combina fuentes locales. El prompt candidato está en
+`prompts/smarth_house_portal.md`. `prompts/sistema.md` y main siguen conservados.
+No confundir pruebas locales o lecturas de la API con entrega real por
+WhatsApp. El catálogo publicado, el estado real y los pendientes están en
+esa revisión; no recrear servicios, claves ni borrar memorias.
+
 - Cómo está hecho, cómo correrlo y qué falta (fases 2 y 3):
   [docs/portal.md](docs/portal.md).
 - El modelo general y las decisiones del usuario:
@@ -107,8 +117,9 @@ atendiendo con `prompts/sistema.md` como hasta ahora. Sirve para
 El empleado no debe borrar conversaciones completas **ni mensajes
 individuales**. El ajuste de permisos se prueba en una copia aislada de
 Chatwoot, no en el servicio compartido con la campaña. No borres memorias
-como rutina ni cambies `main`. Coolify mostró despliegue automático activo
-también para `bot-demo`: comprobalo antes de hacer push o desplegar.
+como rutina ni cambies `main` por trabajo para la demo. La revisión del
+14/09 encontró autodespliegue activo para `agente-ia` y desactivado para
+`bot-demo` y `portal-catalogos`: comprobar de nuevo antes de hacer push.
 
 ---
 

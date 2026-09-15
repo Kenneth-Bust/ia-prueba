@@ -56,6 +56,21 @@ Con un entorno virtual activado también sirve `python scripts/desplegar.py`.
   python scripts/desplegar.py estado ID_DEL_DESPLIEGUE --commit COMMIT_COMPLETO
   ```
 
+**Prompt alternativo.** Por defecto se verifica `prompts/sistema.md`. Para
+la migración de Smarth House, una vez aprobada y configurada su variable
+`PROMPT_SISTEMA`, se debe indicar el archivo esperado:
+
+```text
+python scripts/desplegar.py desplegar --prompt prompts/smarth_house_portal.md
+python scripts/desplegar.py estado ID_DEL_DESPLIEGUE --commit COMMIT_COMPLETO --prompt prompts/smarth_house_portal.md
+```
+
+`--prompt` compara la salud con ese archivo dentro del commit desplegado.
+**No configura el servidor ni autoriza un despliegue.** El comando impreso
+para continuar conserva esa opción. Cuando hay portal, comprobar también
+`catalogo_fuente` y `reglas_catalogo_sha256` en `/salud`; ninguna huella
+reemplaza la prueba funcional de lectura del catálogo y entrega de la foto.
+
 En `estado`, salida 0 significa terminado y verificado, 2 significa pendiente
 y 1 indica un error que revisar. Si una llamada de despliegue pierde la
 conexión, revisá el historial antes de repetir: Coolify pudo haberla recibido.

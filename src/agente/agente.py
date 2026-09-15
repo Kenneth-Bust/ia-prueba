@@ -174,6 +174,8 @@ class Agente:
             self.config.catalogo_ruta,
             self.config.portal_url,
             self.config.portal_clave_bot,
+            self.config.portal_negocio_id,
+            self.config.portal_linea,
         )
         modelo = self.modelo.bind_tools(herramientas)
 
@@ -227,6 +229,12 @@ class Agente:
         simplemente no se cachea.
         """
         texto = leer_prompt(self.config.prompt_sistema)
+        if self.config.portal_url:
+            from .portal import REGLA_CATALOGO
+
+            # Es una regla de la integración, no una tarifa: evita que las
+            # respuestas antiguas pasen por datos comerciales actuales.
+            texto += "\n\n" + REGLA_CATALOGO
 
         if self.config.cache and self.config.proveedor == "claude":
             return SystemMessage(

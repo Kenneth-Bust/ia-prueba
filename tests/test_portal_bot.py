@@ -20,11 +20,13 @@ from agente.portal import (  # noqa: E402
     crear_herramienta_promociones_portal,
     promociones_del_portal,
 )
+from agente.fuente_portal import PortalNoDisponible  # noqa: E402
 
 URL = "https://catalogos.automaticnic.online"
 CLAVE = "clave-de-prueba"
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 100
 SHA_PNG = hashlib.sha256(PNG).hexdigest()
+FOTO_ID = "a" * 32
 
 
 def item(**cambios) -> dict:
@@ -32,12 +34,15 @@ def item(**cambios) -> dict:
         "sku": "PLAN-45", "tipo": "promocion", "nombre": "Plan mensual", "precio": "45.00",
         "moneda": "USD", "unidad": "al mes", "descripcion": "Incluye CRM, app, soporte y capacitación.",
         "vigente_desde": None, "vigente_hasta": "2026-10-11",
-        "fotos": [{"id": "foto-1", "mime": "image/png", "bytes": len(PNG), "sha256": SHA_PNG}],
+        "fotos": [{"id": FOTO_ID, "mime": "image/png", "bytes": len(PNG), "sha256": SHA_PNG}],
     } | cambios
 
 
 def contenido(*items) -> dict:
-    return {"negocio": {"id": "smarth-house", "nombre": "Smarth House"}, "perfil": {}, "items": list(items)}
+    return {
+        "formato": 1, "negocio": {"id": "smarth-house", "nombre": "Smarth House"},
+        "perfil": {}, "reglas": {}, "items": list(items),
+    }
 
 
 class HTTPFalso:
@@ -45,7 +50,7 @@ class HTTPFalso:
 
     def __init__(self, catalogo=None, fotos=None, falla_catalogo=False):
         self.catalogo = catalogo
-        self.fotos = fotos or {}
+        self.fotos = {FOTO_ID if k == "foto-1" else k: v for k, v in (fotos or {}).items()}
         self.falla_catalogo = falla_catalogo
         self.pedidos: list[str] = []
 
@@ -54,8 +59,12 @@ class HTTPFalso:
         assert metodo == "GET"
         if url.endswith("/api/bot/catalogo"):
             if self.falla_catalogo:
-                raise ErrorDePortal("simulado: el portal no contestó.")
-            return json.dumps({"version": 1, "contenido": self.catalogo}).encode("utf-8")
+                raise PortalNoDisponible("simulado: el portal no contestó.")
+            canonico = json.dumps(self.catalogo, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            return json.dumps({
+                "version": 1, "contenido": self.catalogo,
+                "huella": hashlib.sha256(canonico.encode()).hexdigest(),
+            }).encode("utf-8")
         for foto_id, bytes_ in self.fotos.items():
             if url.endswith(f"/api/bot/fotos/{foto_id}"):
                 return bytes_
@@ -71,7 +80,7 @@ def test_trae_la_promocion_vigente_y_la_foto(tmp_path):
     promo = promos[0]
     assert (promo.codigo, promo.precio, promo.moneda) == ("PLAN-45", "45.00", "USD")
     assert promo.imagen is not None and promo.imagen.ruta.read_bytes() == PNG
-    assert http.pedidos == [f"{URL}/api/bot/catalogo", f"{URL}/api/bot/fotos/foto-1"]
+    assert http.pedidos == [f"{URL}/api/bot/catalogo", f"{URL}/api/bot/fotos/{FOTO_ID}"]
 
 
 def test_no_pide_la_foto_dos_veces(tmp_path):
@@ -80,7 +89,7 @@ def test_no_pide_la_foto_dos_veces(tmp_path):
 
     promociones_del_portal(URL, CLAVE, cache_dir=tmp_path, hoy=date(2026, 9, 14), cliente_http=http)
 
-    assert http.pedidos.count(f"{URL}/api/bot/fotos/foto-1") == 1
+    assert http.pedidos.count(f"{URL}/api/bot/fotos/{FOTO_ID}") == 1
 
 
 @pytest.mark.parametrize(

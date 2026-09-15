@@ -73,6 +73,10 @@ def main() -> int:
         pass
 
     parser = argparse.ArgumentParser(description="Administración del portal de catálogos.")
+    parser.add_argument(
+        "--archivo-env", type=Path, default=RAIZ / ".env.portal.local",
+        help="Archivo de conexión del destino; por defecto .env.portal.local.",
+    )
     comandos = parser.add_subparsers(dest="comando", required=True)
 
     crear_negocio = comandos.add_parser("crear-negocio", help="Crea un negocio nuevo.")
@@ -107,7 +111,7 @@ def main() -> int:
     revocar.add_argument("--negocio", required=True)
 
     argumentos = parser.parse_args()
-    config = ConfigPortal.desde_entorno()
+    config = ConfigPortal.desde_entorno(archivo=argumentos.archivo_env)
     repo = RepositorioPostgres(config.dsn, maximo_conexiones=1)
     try:
         repo.migrar()

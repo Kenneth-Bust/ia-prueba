@@ -6,6 +6,10 @@
 .env
 .env.*
 *.key
+.credenciales-*.local
+recursos/_portal_cache/
+tmp/
+temp/
 
 # El entorno virtual de tu máquina: son binarios de Windows, adentro de un
 # contenedor Linux no sirven para nada.

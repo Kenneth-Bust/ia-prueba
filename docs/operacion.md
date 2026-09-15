@@ -5,7 +5,7 @@ el código permite hacer. Si sos un agente de IA que abre este proyecto, leelo
 antes de tocar nada desplegado: te ahorra redescubrir todo y repetir errores
 que ya se pagaron.
 
-Última actualización: 13 de septiembre de 2026.
+Última actualización: 14 de septiembre de 2026.
 
 ---
 
@@ -19,6 +19,7 @@ administrado con **Coolify**. Al 11/09/2026: CPU 18 %, memoria 29 %, disco
 |---|---|---|
 | `agente-ia` | `agente.automaticnic.online` | Bot de la agencia (Smarth House). Rama `main`. |
 | `bot-demo` | `bot-demo.automaticnic.online` | Bot del piloto (Cliente Demo). Rama `piloto-demo`. |
+| `portal-catalogos` | `catalogos.automaticnic.online` | Catálogos por negocio. Rama `portal`; base y volumen propios. |
 | `chatwoot` | `appchatwoot.automaticnic.online` | Una sola instalación, varias cuentas. |
 | Coolify | `appcoolify.automaticnic.online` | Panel. |
 | PostgreSQL | interno `1hrm4idgdx20aqz5grz12fqb` | Memorias de los bots. |
@@ -30,6 +31,7 @@ servidor        dikztpeyebroxdiap1979lsc   (localhost)
 proyecto        luzuylwsssqmine3vgtwqdir   (My first project / production)
 agente-ia       inuqmphtxqxzzrw3pyp724kk
 bot-demo        x2qnwcfwio5vpahcfzdrbsts
+portal-catalogos vhvndsnvosry83dqlztwontm
 postgres        1hrm4idgdx20aqz5grz12fqb
 chatwoot        e5kf6qc7ayczz1rmxqgrx5hq   (es un "service", no una "application")
 ```
@@ -38,6 +40,32 @@ El repositorio es `Kenneth-Bust/ia-prueba`, **público**. Se hizo público
 porque Coolify no tenía credenciales de GitHub y era el camino más corto. No
 contiene secretos: el `.env` está en `.gitignore` y las credenciales viven en
 las variables de entorno de Coolify.
+
+## Preparación de Smarth House para leer el portal — 14/09/2026
+
+La revisión y el contexto para continuar están en
+[revision-portal-smarth-house.md](revision-portal-smarth-house.md).
+El portal está publicado y la oferta de Smarth House quedó en versión 4,
+con tipo Promoción, US$45 al mes por número y la descripción confirmada por
+el usuario. No tiene un plan regular posterior: lo confirma el equipo.
+
+La integración ampliada y el prompt candidato
+`prompts/smarth_house_portal.md` están preparados en la rama `portal`.
+Pasaron pruebas locales, contrato PostgreSQL, Gemini y entrega de texto/foto
+en la cuenta 2, bandeja API 2, conversación sintética 4 de Chatwoot.
+**No se probó todavía su entrega por WhatsApp ni se desplegó esa integración.**
+`agente-ia` sigue en main con `prompts/sistema.md`; bot-demo sigue con
+uniformes. No se modificaron sus variables ni se borraron memorias.
+
+La clave de lectura del negocio ya se creó y está en archivos locales
+ignorados. No está configurada en Coolify. No recrearla ni imprimirla.
+El autodespliegue observado estaba activo para agente-ia y desactivado para
+bot-demo y portal-catalogos; consultar de nuevo antes de subir cambios.
+
+Se detectó que la memoria de agente-ia todavía usa el rol superusuario
+`postgres`. Preparar una migración a permisos limitados con respaldo e
+historial conservado; no cambiar el DSN del bot de la campaña por rutina.
+Los respaldos y una restauración no quedaron verificados en esta revisión.
 
 ## Cómo se reparte Chatwoot
 
