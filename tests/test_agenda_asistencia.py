@@ -1,10 +1,8 @@
 """Distingue reserva y asistencia; comprueba límites con tratamientos distintos."""
 
-import re
-
 import pytest
 
-from test_agenda import agenda, reservar, cita, propuesta
+from test_agenda import agenda, reservar, cita, propuesta, propuesta_actual
 from agente.agenda import Agenda, herramientas_agenda
 from agente.agenda_modelo import ErrorDeAgenda, ReglasAgenda
 from agente.agenda_repositorio import RepositorioAgenda
@@ -12,8 +10,8 @@ from agente.config import RAIZ
 
 
 def cambiar(agenda, referencia, fecha="2026-09-22T11:00"):
-    texto = agenda.proponer("1", "mover", cita_id=referencia, fecha=fecha)
-    agenda.confirmar("1", re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1])
+    agenda.proponer("1", "mover", cita_id=referencia, fecha=fecha)
+    agenda.confirmar("1")
 
 
 def test_agendar_no_confirma_asistencia_y_confirmar_no_reserva_de_nuevo(agenda):
@@ -23,7 +21,8 @@ def test_agendar_no_confirma_asistencia_y_confirmar_no_reserva_de_nuevo(agenda):
     assert agenda.mis_citas("1")[0]["estado"] == "agendada"
     herramienta = next(h for h in herramientas_agenda(agenda) if h.name == "confirmar_asistencia")
     texto = herramienta.invoke({"referencia": referencia}, config={"configurable": {"thread_id": "1"}})
-    assert "ASISTIRE " + actual["asistencia_codigo"] in texto
+    assert "CONFIRMO ASISTENCIA" in texto
+    assert actual["asistencia_codigo"] not in texto
     assert cita(agenda, referencia)["asistencia"] == "pendiente"
     for _ in range(2):
         assert "Asistencia confirmada" in agenda.confirmar_asistencia("1", actual["asistencia_codigo"])
@@ -44,6 +43,14 @@ def test_asistencia_rechaza_otro_contacto_y_codigo_anterior_al_cambio(agenda):
     with pytest.raises(ErrorDeAgenda):
         agenda.confirmar_asistencia("1", codigo)
     agenda.confirmar_asistencia("1", cita(agenda, referencia)["asistencia_codigo"])
+
+
+def test_confirmar_asistencia_sin_codigo_usa_el_ultimo_aviso_y_es_idempotente(agenda):
+    referencia = reservar(agenda)
+    assert "Asistencia confirmada" in agenda.confirmar_asistencia("1")
+    assert "Asistencia confirmada" in agenda.confirmar_asistencia("1")
+    assert cita(agenda, referencia)["asistencia"] == "confirmada"
+    assert agenda.google.creaciones == 1
 
 
 def test_cambio_manual_reinicia_asistencia_pero_enlace_no(agenda):
@@ -69,10 +76,19 @@ def test_asistencia_cancelada_o_pasada_no_se_confirma(agenda):
     with pytest.raises(ErrorDeAgenda):
         agenda.confirmar_asistencia("1", actual["asistencia_codigo"])
     agenda.reloj_prueba[0] = actual["inicio"] - 3600
-    texto = agenda.proponer("1", "cancelar", cita_id=referencia)
-    agenda.confirmar("1", re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1])
+    agenda.proponer("1", "cancelar", cita_id=referencia)
+    agenda.confirmar("1")
     with pytest.raises(ErrorDeAgenda):
         agenda.confirmar_asistencia("1", actual["asistencia_codigo"])
+
+
+def test_cancelar_ultima_cita_no_confirma_otra_por_error(agenda):
+    reservar(agenda, fecha="2026-09-22T09:00")
+    ultima = reservar(agenda, fecha="2026-09-22T10:00")
+    agenda.proponer("1", "cancelar", cita_id=ultima)
+    agenda.confirmar("1")
+    with pytest.raises(ErrorDeAgenda, match="identificar"):
+        agenda.confirmar_asistencia("1")
 
 
 def test_cita_heredada_no_asume_asistencia(agenda):
@@ -83,7 +99,7 @@ def test_cita_heredada_no_asume_asistencia(agenda):
             antigua.pop(campo)
         db.guardar("cita", antigua)
     assert agenda.mis_citas("1")[0]["asistencia"] == "pendiente"
-    assert "ASISTIRE" in agenda.solicitar_asistencia("1", referencia)
+    assert "CONFIRMO ASISTENCIA" in agenda.solicitar_asistencia("1", referencia)
     assert agenda.google.creaciones == 1
 
 
@@ -101,7 +117,7 @@ def test_recordatorio_usa_estado_actual_de_asistencia(agenda):
     agenda.reloj_prueba[0] = actual["inicio"] - 86400
     agenda.enviar_pendientes(canal)
     assert "Tu asistencia ya está confirmada" in canal.textos[-1]
-    assert "ASISTIRE" not in canal.textos[-1]
+    assert "CONFIRMO ASISTENCIA" not in canal.textos[-1]
 
 
 def clinica(agenda):
@@ -109,8 +125,8 @@ def clinica(agenda):
 
 
 def agendar_tratamiento(agenda, contacto, servicio, recurso, fecha="2026-09-22T09:00"):
-    texto = agenda.proponer(contacto, "alta", servicio=servicio, recurso=recurso, fecha=fecha, nombre="Prueba")
-    return agenda.confirmar(contacto, re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1])
+    agenda.proponer(contacto, "alta", servicio=servicio, recurso=recurso, fecha=fecha, nombre="Prueba")
+    return agenda.confirmar(contacto)
 
 
 def test_clinica_cuatro_consultas_y_siguiente_media_hora(agenda):
@@ -141,11 +157,11 @@ def test_duracion_y_limite_del_tratamiento_se_comparten_entre_profesionales(agen
 def test_limite_tratamiento_se_revalida_al_confirmar(agenda):
     clinica(agenda)
     agenda.reglas.servicios["tratamiento_largo"]["capacidad_simultanea"] = 1
-    texto = agenda.proponer("2", "alta", servicio="tratamiento_largo", recurso="profesional_2",
-                           fecha="2026-09-22T09:00", nombre="Prueba")
+    agenda.proponer("2", "alta", servicio="tratamiento_largo", recurso="profesional_2",
+                    fecha="2026-09-22T09:00", nombre="Prueba")
     agendar_tratamiento(agenda, "1", "tratamiento_largo", "profesional_1")
     with pytest.raises(ErrorDeAgenda, match="último cupo"):
-        agenda.confirmar("2", re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1])
+        agenda.confirmar("2")
 
 
 def test_cambio_incierto_superpuesto_no_cuenta_dos_veces_misma_persona(agenda):

@@ -398,7 +398,7 @@ class Chatwoot(Canal):
                 from ..agenda import Agenda
                 informacion = ((informacion + " — ") if informacion else "") + Agenda._instruccion_asistencia(cita)
             parametros = {"1": cita.get("negocio_nombre", "nuestro equipo"), "2": estado,
-                          "3": fecha, "4": cita["id"], "5": informacion or "Respondé para consultar al equipo"}
+                          "3": fecha, "4": "No requerida", "5": informacion or "Respondé para consultar al equipo"}
             datos["content"] = (f"Actualización de tu cita con {parametros['1']}: {parametros['2']}. "
                                 f"Fecha y hora: {parametros['3']}. Referencia: {parametros['4']}. "
                                 f"Información: {parametros['5']}.")

@@ -359,6 +359,7 @@ canceladas por cualquiera de las partes; los cambios se avisan por WhatsApp.</p>
         if agenda is not None:
             resultado["agenda"] = "habilitada"
             resultado["agenda_asistencia"] = "habilitada"
+            resultado["agenda_confirmacion"] = "simple"
             resultado["agenda_reglas_sha256"] = hashlib.sha256(config.agenda_reglas_ruta.read_bytes()).hexdigest()
         return resultado
 

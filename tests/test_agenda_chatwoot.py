@@ -71,7 +71,7 @@ def test_webhook_confirma_sin_usar_ia(agenda):
     agente.agenda = agenda
     agente.config.chatwoot_bandeja_id = "1"
     canal = CanalAgenda()
-    entrada = evento("CONFIRMAR " + referencia, conversacion=1)
+    entrada = evento("Confirmar", conversacion=1)
     entrada.update(sender={"id": 1, "type": "contact"}, inbox={"id": 1})
     with cliente(canal, agente) as web:
         resultado = web.post("/chatwoot/secreto", json=entrada)
@@ -79,6 +79,8 @@ def test_webhook_confirma_sin_usar_ia(agenda):
     assert agenda.google.creaciones == 1
     assert len(canal.envios()) == 1
     assert "Cita agendada" in canal.envios()[0]
+    assert referencia not in canal.envios()[0]
+    assert "Referencia:" not in canal.envios()[0]
 
 
 def test_webhook_otro_contacto_no_puede_confirmar_propuesta(agenda):
@@ -96,12 +98,11 @@ def test_webhook_otro_contacto_no_puede_confirmar_propuesta(agenda):
 
 def test_webhook_confirma_asistencia_sin_llamar_al_modelo(agenda):
     referencia = reservar(agenda)
-    codigo = cita(agenda, referencia)["asistencia_codigo"]
     agente = agente_falso([])
     agente.agenda = agenda
     agente.config.chatwoot_bandeja_id = "1"
     canal = CanalAgenda()
-    entrada = evento("ASISTIRE " + codigo, conversacion=1)
+    entrada = evento("Confirmo asistencia", conversacion=1)
     entrada.update(sender={"id": 1, "type": "contact"}, inbox={"id": 1})
     with cliente(canal, agente) as web:
         assert web.post("/chatwoot/secreto", json=entrada).status_code == 200
@@ -117,7 +118,9 @@ def test_plantilla_distingue_reserva_y_asistencia():
     canal.enviar_aviso_agenda(envio, contacto, cita, "actualizacion_cita", "es")
     parametros = canal.mensajes[-1]["template_params"]["processed_params"]["body"]
     assert parametros["2"] == "agendada"
-    assert "ASISTIRE abcdef123456" in parametros["5"]
+    assert "CONFIRMO ASISTENCIA" in parametros["5"]
+    assert "abcdef123456" not in parametros["5"]
+    assert parametros["4"] == "No requerida"
     cita["asistencia"] = "confirmada"
     canal.enviar_aviso_agenda(envio, contacto, cita, "actualizacion_cita", "es")
     assert "Tu asistencia ya está confirmada" in canal.mensajes[-1]["content"]

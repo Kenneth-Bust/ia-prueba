@@ -2,6 +2,18 @@
 
 ## Resultado
 
+**Correcciones desplegadas en Smarth House**: commit `eeab1fe`, despliegue
+`7athnkohguvmz0whcowisnug`, finalizado y comprobado con `running:healthy`.
+La salud pública informa `agenda_asistencia: habilitada`. La prueba funcional
+completa desde WhatsApp sigue pendiente del usuario.
+
+Validación: **488 pruebas aprobadas, 46 omitidas** en la suite completa; las
+omitidas corresponden a integraciones optativas. Además, **12 pruebas de
+agenda seleccionadas aprobadas en PostgreSQL aislado**, incluida concurrencia
+de cinco solicitudes para cuatro cupos. El caso final de duración y límite
+compartido se volvió a comprobar en PostgreSQL tras optimizar la consulta.
+La lectura del Google Calendar autorizado también respondió correctamente.
+
 La base implementada permite reservar, reprogramar y cancelar en Google
 Calendar. Mantiene las operaciones pendientes y los avisos en almacenamiento
 persistente, verifica el contacto y vuelve a comprobar los cupos al reservar.
@@ -12,7 +24,7 @@ La revisión encontró y corrigió estos puntos:
 
 1. **Reserva y asistencia eran el mismo estado.** Ahora una reserva completada
    se muestra como `agendada`, con `asistencia: pendiente`. Solo el mensaje
-   `ASISTIRE <código>` del contacto correspondiente confirma su asistencia.
+   `CONFIRMO ASISTENCIA` del contacto correspondiente confirma su asistencia.
    El modelo puede solicitar ese paso, pero no ejecutarlo. Repetirlo no crea
    otra cita. Las reservas anteriores se consideran sin asistencia confirmada.
 2. **Faltaba un límite propio del tratamiento.** El campo opcional
@@ -81,12 +93,12 @@ o se puede ejecutar `sincronizar` antes de consultar una base local.
 
 1. Desde tu WhatsApp de prueba escribí: “Quiero agendar una videollamada para
    mañana”. Elegí un horario disponible y proporcioná tu nombre.
-2. Mandá exactamente `CONFIRMAR <código>` indicado por el bot. Antes de ese
-   mensaje solo hay una propuesta; aún no existe la reserva.
+2. Respondé `CONFIRMAR`, sin copiar códigos. Antes de ese mensaje solo hay una
+   propuesta; aún no existe la reserva.
 3. Comprobá el evento en el calendario de la agencia y el enlace de Google Meet.
-4. Mandá `ASISTIRE <código>` del aviso y luego “¿Cómo está mi cita?”. Debe
+4. Mandá `CONFIRMO ASISTENCIA` y luego “¿Cómo está mi cita?”. Debe
    mostrar reserva agendada y asistencia confirmada.
-5. Pedí reprogramarla, confirmá el nuevo código y comprobá que el mismo evento
+5. Pedí reprogramarla, respondé otra vez `CONFIRMAR` y comprobá que el mismo evento
    cambie de horario; la asistencia debe volver a pendiente.
 6. Pedí cancelarla y confirmá. Debe desaparecer del calendario activo y no
    mantener recordatorios pendientes de esa reserva.
@@ -113,3 +125,21 @@ prueba con el bot habilitado. No borrar conversaciones ni memorias para probar.
 
 La base sirve para el piloto de Smarth House y para configurar la clínica.
 No equivale a una clínica ya conectada ni a una entrega operativa completa.
+
+## Confirmación sencilla para WhatsApp
+
+El usuario no copia identificadores. Después del resumen de una alta,
+reprogramación o cancelación responde `CONFIRMAR`. También se aceptan
+`CONFIRMO` y `SÍ, CONFIRMO`. El servidor recupera la última propuesta asociada
+a esa conversación y al contacto verificado, comprueba que no venció y vuelve
+a validar el cupo antes de escribir en Google. Repetir la respuesta no duplica
+el evento. Una conversación distinta no puede confirmar esa propuesta.
+
+Las referencias técnicas permanecen en PostgreSQL y en la descripción privada
+del evento para conciliación; no aparecen en los mensajes normales ni en los
+recordatorios. Los códigos anteriores siguen siendo aceptados de forma interna
+para terminar conversaciones iniciadas antes de este cambio.
+
+Referencias: [estados de eventos y respuestas de invitados en Google](https://developers.google.com/workspace/calendar/api/v3/reference/events),
+[ventana de WhatsApp en Chatwoot](https://developers.chatwoot.com/self-hosted/supported-features)
+y [caducidad de tokens OAuth de Google](https://developers.google.com/identity/protocols/oauth2#expiration).

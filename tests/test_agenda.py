@@ -85,7 +85,15 @@ def agenda(tmp_path, request):
 
 def propuesta(agenda, conversacion="1", fecha="2026-09-22T09:00", recurso="asesor"):
     texto = agenda.proponer(conversacion, "alta", servicio="demo", recurso=recurso, fecha=fecha, nombre="Persona de prueba")
-    return re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1]
+    assert "respondé CONFIRMAR" in texto
+    assert not re.search(r"CONFIRMAR\s+[a-f0-9]", texto)
+    return propuesta_actual(agenda, conversacion)
+
+
+def propuesta_actual(agenda, conversacion="1"):
+    with agenda.repo.transaccion() as db:
+        control = db.obtener("control", "confirmacion:" + str(conversacion))
+    return control["propuesta_id"]
 
 
 def reservar(agenda, **kwargs):
@@ -105,6 +113,23 @@ def test_proponer_no_es_reservar_y_reintentar_confirmacion_no_duplica(agenda):
     assert agenda.confirmar("1", ref) == primera
     assert agenda.google.creaciones == 1
     assert cita(agenda, primera)["estado"] == "confirmada"
+
+
+def test_confirmar_sin_codigo_usa_la_ultima_propuesta_y_es_idempotente(agenda):
+    primera = propuesta(agenda, fecha="2026-09-22T09:00")
+    segunda = propuesta(agenda, fecha="2026-09-22T10:00")
+    assert primera != segunda
+    identificador = agenda.confirmar("1")
+    assert agenda.confirmar("1") == identificador
+    assert datetime.fromtimestamp(cita(agenda, identificador)["inicio"], agenda.reglas.tz).hour == 10
+    assert agenda.google.creaciones == 1
+
+
+def test_confirmar_sin_codigo_no_toma_propuesta_de_otro_contacto(agenda):
+    propuesta(agenda, conversacion="1")
+    with pytest.raises(ErrorDeAgenda, match="propuesta pendiente"):
+        agenda.confirmar("2")
+    assert agenda.google.creaciones == 0
 
 
 def test_cuatro_cupos_y_quinta_rechazada_con_dos_instancias(agenda):
@@ -143,8 +168,8 @@ def test_timeout_despues_de_crear_se_recupera_tras_reinicio(agenda):
 
 def test_cancelacion_libera_cupo_una_vez(agenda):
     identificador = reservar(agenda)
-    texto = agenda.proponer("1", "cancelar", cita_id=identificador)
-    ref = re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1]
+    agenda.proponer("1", "cancelar", cita_id=identificador)
+    ref = propuesta_actual(agenda)
     agenda.confirmar("1", ref)
     agenda.confirmar("1", ref)
     assert cita(agenda, identificador)["estado"] == "cancelada"
@@ -154,8 +179,8 @@ def test_cancelacion_libera_cupo_una_vez(agenda):
 def test_cambio_fallido_conserva_original(agenda):
     identificador = reservar(agenda)
     antes = cita(agenda, identificador)
-    texto = agenda.proponer("1", "mover", cita_id=identificador, fecha="2026-09-22T10:00")
-    ref = re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1]
+    agenda.proponer("1", "mover", cita_id=identificador, fecha="2026-09-22T10:00")
+    ref = propuesta_actual(agenda)
     agenda.google.falla = "rechazar"
     agenda.confirmar("1", ref)
     despues = cita(agenda, identificador)
@@ -165,9 +190,9 @@ def test_cambio_fallido_conserva_original(agenda):
 
 def test_cambio_incierto_protege_ambos_horarios(agenda):
     identificador = reservar(agenda)
-    texto = agenda.proponer("1", "mover", cita_id=identificador, fecha="2026-09-22T10:00")
+    agenda.proponer("1", "mover", cita_id=identificador, fecha="2026-09-22T10:00")
     agenda.google.falla = "despues"
-    agenda.confirmar("1", re.search(r"CONFIRMAR ([a-f0-9]{12})", texto)[1])
+    agenda.confirmar("1")
     for fecha in ("2026-09-22T09:00", "2026-09-22T10:00"):
         with pytest.raises(ErrorDeAgenda, match="cupos"):
             propuesta(agenda, conversacion="2", fecha=fecha)
@@ -330,6 +355,7 @@ def test_propuesta_de_agenda_no_se_convierte_en_confirmacion_por_el_modelo(agend
         AIMessage("Ya está confirmada la cita: afirmación falsa del modelo")]))
     agente.grafo = agente._construir_grafo()
     respuesta = agente.responder("Quiero reservar a las nueve", "1")
-    assert "CONFIRMAR " in respuesta.texto
+    assert "respondé CONFIRMAR" in respuesta.texto
+    assert not re.search(r"CONFIRMAR\s+[a-f0-9]", respuesta.texto)
     assert "afirmación falsa" not in respuesta.texto
     assert agenda.google.creaciones == 0
