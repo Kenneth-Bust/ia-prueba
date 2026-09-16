@@ -85,6 +85,23 @@ por cliente, ramas para desarrollo, dos o más números como bandejas y la
 relación validada entre cliente, SKU, precio e imagen. No uses la memoria de
 la conversación ni el texto libre de Gemini como fuente del catálogo.
 
+### Agenda por WhatsApp con Google Calendar
+
+**Leé [docs/agenda.md](docs/agenda.md) antes de tocar la agenda.** Implementada
+el 15/09/2026 en `funcionalidad/agenda-google-calendar`: el bot consulta cupos,
+reserva, cancela y reprograma citas reales en Google Calendar, con enlace de
+Meet. Smarth House la usa para sus demos por videollamada.
+
+- **Conectada y verificada contra Google real**, no simulada: alta, cambio,
+  cancelación, detección de bajas hechas a mano en el calendario y una
+  conversación completa con el modelo. Está **desplegada: no**.
+- **La confirmación no la ejecuta el modelo.** Las herramientas devuelven una
+  propuesta con su referencia; el webhook procesa el `CONFIRMAR` explícito.
+  No tratar una propuesta como cita reservada.
+- **Se activa solo con `AGENDA_REGLAS_RUTA`.** Sin esa variable la agenda
+  queda apagada y los bots se comportan como antes. Las siete variables de
+  agenda se cargan juntas: a medias, el contenedor no arranca.
+
 ### Trabajo próximo: demo de uniformes y sublimación
 
 El usuario pidió preparar la demo en **la rama `piloto-demo`**, con

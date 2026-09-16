@@ -166,6 +166,10 @@ class Agente:
     def _construir_grafo(self):
         """Arma el grafo: el modelo, las herramientas, y la vuelta al modelo."""
 
+        from .agenda import crear_agenda
+        if not hasattr(self, "agenda"):
+            self.agenda = crear_agenda(self.config)
+
         # bind_tools() es lo que le avisa al modelo qué herramientas existe.
         # Sin esto nunca las pide, por más que estén escritas. Las de catálogo
         # dependen de la configuración de cada bot.
@@ -176,6 +180,7 @@ class Agente:
             self.config.portal_clave_bot,
             self.config.portal_negocio_id,
             self.config.portal_linea,
+            self.agenda,
         )
         modelo = self.modelo.bind_tools(herramientas)
 
@@ -236,6 +241,10 @@ class Agente:
             # respuestas antiguas pasen por datos comerciales actuales.
             texto += "\n\n" + REGLA_CATALOGO
 
+        if getattr(self, "agenda", None) is not None:
+            from .agenda import REGLA_AGENDA
+            texto += "\n\n" + REGLA_AGENDA
+
         if self.config.cache and self.config.proveedor == "claude":
             return SystemMessage(
                 content=[
@@ -270,11 +279,22 @@ class Agente:
         entrada = _mensaje_humano(texto, archivos)
 
         salida = self._invocar_con_reintentos(entrada, conversacion)
-        return _a_respuesta(
+        respuesta = _a_respuesta(
             salida["messages"][-1],
             self.config.modelo,
             adjuntos=_adjuntos_del_turno(salida["messages"]),
         )
+        # Una propuesta de agenda lleva sus datos y autorización exactos. El LLM
+        # no puede transformar "pendiente" en "confirmada" ni omitir el código.
+        for mensaje in reversed(salida["messages"]):
+            if isinstance(mensaje, HumanMessage):
+                break
+            if isinstance(mensaje, ToolMessage) and isinstance(mensaje.artifact, dict):
+                propuesta = mensaje.artifact.get("agenda_propuesta")
+                if isinstance(propuesta, str) and propuesta:
+                    respuesta.texto = propuesta
+                    break
+        return respuesta
 
     def _invocar_con_reintentos(self, entrada, conversacion: str) -> dict:
         """Llama al grafo y reintenta si el proveedor está sobrecargado.

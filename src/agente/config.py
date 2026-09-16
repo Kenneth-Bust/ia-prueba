@@ -127,8 +127,21 @@ class Config:
     portal_clave_bot: str = field(default="", repr=False)
     portal_negocio_id: str = ""
     portal_linea: str = ""
+    agenda_reglas_ruta: Path | None = None
+    agenda_dsn: str = field(default="", repr=False)
+    agenda_google_cliente_id: str = field(default="", repr=False)
+    agenda_google_secreto: str = field(default="", repr=False)
+    agenda_google_refresh_token: str = field(default="", repr=False)
+    agenda_plantilla_whatsapp: str = ""
+    agenda_plantilla_idioma: str = "es"
 
     def __post_init__(self):
+        if self.agenda_reglas_ruta:
+            if not all((self.agenda_dsn, self.agenda_google_cliente_id, self.agenda_google_secreto,
+                        self.agenda_google_refresh_token, self.chatwoot_cuenta_id, self.chatwoot_bandeja_id)):
+                raise ErrorDeConfiguracion("Para activar agenda completá su base, OAuth de Google y cuenta/bandeja de Chatwoot.")
+            if self.modo == "produccion" and not self.agenda_dsn.startswith(("postgresql://", "postgres://", "host=", "dbname=", "user=", "service=")):
+                raise ErrorDeConfiguracion("La agenda de producción necesita PostgreSQL persistente.")
         if any((self.portal_url, self.portal_clave_bot, self.portal_negocio_id, self.portal_linea)):
             if not all((self.portal_url, self.portal_clave_bot, self.portal_negocio_id)):
                 raise ErrorDeConfiguracion(
@@ -227,6 +240,13 @@ class Config:
             portal_clave_bot=(os.getenv("PORTAL_CLAVE_BOT") or "").strip(),
             portal_negocio_id=(os.getenv("PORTAL_NEGOCIO_ID") or "").strip(),
             portal_linea=(os.getenv("PORTAL_LINEA") or "").strip(),
+            agenda_reglas_ruta=_ruta_catalogo_opcional("AGENDA_REGLAS_RUTA", carpeta="agendas"),
+            agenda_dsn=(os.getenv("AGENDA_DSN") or "").strip(),
+            agenda_google_cliente_id=(os.getenv("AGENDA_GOOGLE_CLIENTE_ID") or "").strip(),
+            agenda_google_secreto=(os.getenv("AGENDA_GOOGLE_SECRETO") or "").strip(),
+            agenda_google_refresh_token=(os.getenv("AGENDA_GOOGLE_REFRESH_TOKEN") or "").strip(),
+            agenda_plantilla_whatsapp=(os.getenv("AGENDA_PLANTILLA_WHATSAPP") or "").strip(),
+            agenda_plantilla_idioma=(os.getenv("AGENDA_PLANTILLA_IDIOMA") or "es").strip(),
         )
 
 
@@ -332,17 +352,17 @@ def _identificador_opcional(nombre: str) -> str:
     return str(int(valor)) if valor else ""
 
 
-def _ruta_catalogo_opcional(nombre: str) -> Path | None:
+def _ruta_catalogo_opcional(nombre: str, carpeta: str = "catalogos") -> Path | None:
     valor = (os.getenv(nombre) or "").strip()
     if not valor:
         return None
     relativa = Path(valor)
     if relativa.is_absolute():
-        raise ErrorDeConfiguracion(f"{nombre} debe ser una ruta relativa dentro de catalogos/.")
+        raise ErrorDeConfiguracion(f"{nombre} debe ser una ruta relativa dentro de {carpeta}/.")
     ruta = (RAIZ / relativa).resolve()
-    catalogos = (RAIZ / "catalogos").resolve()
+    catalogos = (RAIZ / carpeta).resolve()
     if not ruta.is_relative_to(catalogos) or ruta.suffix.lower() != ".json":
-        raise ErrorDeConfiguracion(f"{nombre} debe apuntar a un JSON dentro de catalogos/.")
+        raise ErrorDeConfiguracion(f"{nombre} debe apuntar a un JSON dentro de {carpeta}/.")
     return ruta
 
 
@@ -372,3 +392,70 @@ def variables_demo() -> dict[str, str]:
         nombre: valor or ""
         for nombre, valor in dotenv_values(RAIZ / ".env.demo.local").items()
     }
+
+
+LETRAS_NEGOCIO = "abcdefghijklmnopqrstuvwxyz0123456789-"
+
+
+def _archivo_agenda(negocio: str = "") -> Path:
+    """Un archivo por negocio: conectar un cliente no le pisa el token a otro.
+
+    Sin negocio conserva `.env.agenda.local`, que es el que ya está en uso. El
+    nombre se valida con el mismo alfabeto que las reglas de agenda, así no
+    puede armar una ruta fuera de la raíz del proyecto con `..` o una barra.
+    """
+    if not negocio:
+        return RAIZ / ".env.agenda.local"
+    if not 2 <= len(negocio) <= 50 or any(letra not in LETRAS_NEGOCIO for letra in negocio):
+        raise ErrorDeConfiguracion(
+            "El negocio se escribe en minúsculas, dígitos y guiones, igual que en sus reglas de agenda."
+        )
+    return RAIZ / f".env.agenda.{negocio}.local"
+
+
+def variables_agenda_locales(negocio: str = "") -> dict[str, str]:
+    """Conexión administrada de Google; nunca se carga automáticamente en el bot."""
+    return {k: v or "" for k, v in dotenv_values(_archivo_agenda(negocio), interpolate=False).items()}
+
+
+def config_agenda_local(negocio: str = ""):
+    """Carga explícita para la CLI, sin cambiar la activación normal del webhook."""
+    archivo = _archivo_agenda(negocio)
+    load_dotenv(archivo, override=True)
+    configuracion = Config.desde_entorno()
+    if not configuracion.agenda_reglas_ruta:
+        raise ErrorDeConfiguracion(f"Completá AGENDA_REGLAS_RUTA en {archivo.name}.")
+    return configuracion
+
+
+def guardar_conexion_agenda(valores: dict[str, str], negocio: str = ""):
+    """Guarda tokens sin imprimirlos ni cambiar la configuración activa."""
+    from dotenv import set_key
+    permitidas = {"AGENDA_GOOGLE_CLIENTE_ID", "AGENDA_GOOGLE_SECRETO", "AGENDA_GOOGLE_REFRESH_TOKEN"}
+    archivo = _archivo_agenda(negocio)
+    for clave, valor in valores.items():
+        if clave not in permitidas:
+            raise ErrorDeConfiguracion("Variable de conexión no permitida.")
+        set_key(str(archivo), clave, valor)
+
+
+def cargar_oauth_google(ruta: Path, negocio: str = ""):
+    """Importa el JSON de un cliente OAuth Desktop, fuera del repositorio publicado."""
+    import json
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    instalado = datos.get("installed")
+    if not isinstance(instalado, dict) or not instalado.get("client_id") or not instalado.get("client_secret"):
+        raise ErrorDeConfiguracion("Necesitás el JSON de un cliente OAuth de tipo aplicación de escritorio.")
+    guardar_conexion_agenda({"AGENDA_GOOGLE_CLIENTE_ID": instalado["client_id"],
+                            "AGENDA_GOOGLE_SECRETO": instalado["client_secret"]}, negocio)
+
+
+def dsn_pruebas_agenda():
+    """Prueba optativa: solo la base aislada que ya usa el portal de pruebas."""
+    if not _booleano("AGENDA_PROBAR_POSTGRES", False):
+        return ""
+    from psycopg.conninfo import conninfo_to_dict
+    dsn = dotenv_values(RAIZ / ".env.portal.local", interpolate=False).get("PORTAL_DSN") or ""
+    if not dsn or conninfo_to_dict(dsn).get("dbname") != "catalogos_pruebas":
+        raise ErrorDeConfiguracion("La prueba de agenda exige la base aislada catalogos_pruebas.")
+    return dsn

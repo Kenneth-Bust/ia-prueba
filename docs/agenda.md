@@ -1,0 +1,257 @@
+# Agenda: Smarth House y base para otros negocios
+
+## Estado
+
+Desarrollo iniciado el 15/09/2026, rama `funcionalidad/agenda-google-calendar`,
+partiendo de `9bf6a89`. El usuario pidió implementarlo y desplegarlo primero
+en Smarth House. **Todavía no está desplegado**, pero ya no es solo código:
+el 15/09/2026 se conectó Google y se validó el circuito completo contra la
+API real. No crear cuentas ni recursos para la clínica sin su aceptación.
+
+### Verificado el 15/09/2026 contra Google real
+
+Cuenta autorizada `joelitocruz5@gmail.com`, proyecto `smarth-house-agenda`,
+cliente OAuth de escritorio, alcances `calendar.events`, `userinfo.email` y
+`openid`. Base local `datos/agenda-pruebas.db`, reglas de Smarth House.
+
+| Operación | Resultado |
+|---|---|
+| Alta | Evento creado con enlace de Meet generado por Google. |
+| Reprogramar | Conserva el mismo `evento_id`: no duplica el evento. |
+| Cancelar | El evento queda `cancelled` y sale del calendario activo. |
+| Baja hecha a mano en Google | `sincronizar()` la detecta, cancela la cita, **anula los recordatorios pendientes** y encola el aviso de cancelación. |
+| Conversación real (Gemini) | El modelo llamó a `consultar_disponibilidad` antes de cada respuesta y a `agendar_cita` con la fecha ISO; no inventó horarios. La propuesta se devolvió literal y la confirmación la ejecutó el servidor. |
+
+Suite completa: 441 pasaron, 34 salteados. El usuario eligió el calendario
+`primary` de esa cuenta, no uno dedicado: las demos conviven con su agenda
+personal y cualquier evento suyo ocupa el cupo. Para la clínica corresponde
+revisar esa decisión, porque ahí son cuatro calendarios y datos de pacientes.
+
+### Pendiente antes de desplegar
+
+1. **PostgreSQL propio de la agenda.** `MODO=produccion` rechaza cualquier DSN
+   que no sea Postgres (`config.py`). El DSN va con el host interno de Docker.
+2. **Plantilla de WhatsApp aprobada.** Solo afecta a los avisos fuera de la
+   ventana de 24 h, es decir los recordatorios. La confirmación inmediata sale
+   como mensaje normal porque la conversación está abierta.
+3. **Publicar la app de OAuth.** En Testing el refresh token vence a los siete
+   días. Publicar exige completar antes la página de marca.
+4. **Verificar `PROMPT_SISTEMA` en el servidor.** Un valor viejo se traduce en
+   silencio al prompt archivado (`config.ruta_del_prompt()`): el bot tendría
+   las herramientas de agenda y un prompt que no sabe que existen.
+5. **Cargar las siete variables de agenda de una sola vez.** Si quedan a medias,
+   la validación de `config.py` impide arrancar el contenedor.
+
+La configuración aprobada de Smarth House es:
+
+- Lunes a sábado, de 08:00 a 17:30, zona `America/Managua`.
+- Demo por videollamada de 30 minutos, una a la vez.
+- Confirmación inmediata y recordatorios 24 horas y una hora antes.
+- Agenda editable también desde Google Calendar por el equipo.
+
+Supuestos iniciales editables: anticipación mínima de una hora, agenda abierta
+60 días y enlace de Google Meet por cita. La cuenta indicada por el usuario
+se autoriza con OAuth; nunca guardar sus contraseñas en el proyecto.
+
+## Implementación
+
+| Archivo | Responsabilidad |
+|---|---|
+| `src/agente/agenda_modelo.py` | Horarios, zona, servicios, profesionales, cupos y superposición de intervalos. |
+| `src/agente/agenda_repositorio.py` | Persistencia SQLite de prueba o PostgreSQL de producción. Tabla propia `agenda_registros`, separada del checkpointer. |
+| `src/agente/agenda.py` | Herramientas, propuestas, reservas, cancelaciones, cambios, sincronización y cola de avisos. |
+| `src/agente/calendario_google.py` | OAuth offline y API de Calendar; eventos con ID estable y cambios condicionados por versión. |
+| `src/agente/canales/chatwoot.py` | Avisos en ventana abierta o mediante plantilla; validación de contacto/bandeja y conciliación de envíos inciertos. |
+| `src/agente/web/webhook.py` | Confirmación determinista y trabajador de agenda cada 30 segundos. |
+| `agendas/smarth_house.json` | Reglas de la agencia. Se incluyen en Docker. |
+| `agendas/clinica_ejemplo.json` | Configuración ficticia de cuatro profesionales; no apunta a calendarios reales. |
+
+No se añadieron dependencias Python: utiliza la biblioteca estándar, LangChain
+y el conector/pool de PostgreSQL disponibles en el proyecto.
+
+La agenda se activa únicamente con `AGENDA_REGLAS_RUTA` y una configuración
+completa. Portal y agenda pueden coexistir. Sin esa variable, los bots
+conservan las herramientas existentes y la demo se deriva al equipo.
+
+### Confirmación antes de modificar
+
+Las herramientas preparan una propuesta con fecha, horario, recurso y nombre.
+La persona escribe `CONFIRMAR <referencia>` para ejecutarla. La propuesta
+vence en 15 minutos y no retiene cupos. Al confirmar se valida nuevamente la
+capacidad, dentro de una transacción compartida por todas las conversaciones.
+
+El modelo no tiene una herramienta para ejecutar esa confirmación: el webhook
+procesa el texto explícito y comprueba que la propuesta pertenezca al contacto
+y a la conversación. La respuesta visible de una propuesta sale del resultado
+validado de la herramienta, aunque el modelo redacte después otra cosa.
+Esta primera versión exige esa confirmación escrita, incluso si la solicitud
+inicial llegó por audio. Un «sí» suelto no crea ni cancela citas.
+
+Los IDs de contacto provienen del webhook autenticado; no son argumentos que
+pueda inventar el modelo. Una conversación nueva del mismo contacto puede
+consultar las mismas citas. No incluye gestión de tutores/familiares ni
+historia clínica: cada cita pide solo el nombre necesario para identificarla.
+
+### Capacidad y recuperación
+
+- PostgreSQL serializa la asignación con un candado por negocio. El pool
+  compartido usa como máximo tres conexiones por DSN en cada proceso.
+- Las operaciones pendientes consumen capacidad. Una reprogramación incierta
+  protege origen y destino hasta resolver qué ocurrió en Google.
+- El ID del evento es estable. Después de un timeout se consulta ese mismo
+  evento; no se repite la reserva con otro identificador.
+- Los cambios y cancelaciones usan `etag`/`If-Match`. Un cambio concurrente
+  hecho por recepción exige volver a consultar en vez de sobrescribirlo.
+- Los avisos tienen clave propia por cita, versión y tipo. Una falla al enviar
+  WhatsApp no vuelve a crear la cita.
+- `aceptado` significa que Chatwoot recibió el mensaje, no que WhatsApp lo
+  entregó o que el contacto lo leyó. Verificar entrega en Chatwoot.
+- Ante un POST incierto a Chatwoot se busca la marca `agenda_envio_id`. Si
+  no se encuentra en los mensajes recuperados, queda `incierto` para revisión;
+  no se reenvía automáticamente. La API no garantiza idempotencia de envíos.
+- Los recordatorios atrasados más de 30 minutos se omiten para no enviar
+  varios avisos viejos al reiniciar. Nunca se envían después del inicio.
+
+Las propuestas y reservas viven en la base de agenda, no en la memoria del
+modelo. No borrar conversaciones ni checkpoints para cambiar la agenda.
+
+## Recepción y Google Calendar
+
+El trabajador consulta eventos por lotes dentro del horizonte configurado y
+actualiza citas conocidas. Los cambios de horario y cancelaciones de eventos
+vinculados generan avisos y sustituyen los recordatorios anteriores.
+
+En calendarios con capacidad mayor que uno:
+
+- Un evento normal consume un cupo.
+- Un evento de todo el día o con título que empiece por `[BLOQUEO]` bloquea
+  toda la capacidad en ese intervalo.
+- Los eventos marcados como libre (`transparent`) no crean bloqueos externos.
+  Una reserva del bot sigue consumiendo su cupo hasta cancelarla.
+
+Recepción puede crear una cita en Google: el bot la considera ocupación.
+Para que esa cita nueva reciba avisos por WhatsApp y pueda gestionarse desde
+el chat, debe vincularse al contacto correcto. No deducir teléfonos a partir
+del título del evento. Primera versión: vinculación administrada con la CLI:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\agenda_admin.py vincular --conversacion ID --servicio demo --recurso asesor --evento ID_GOOGLE --nombre "Nombre de la persona"
+```
+
+La CLI comprueba cuenta y bandeja contra Chatwoot antes de asociar el evento.
+Los avisos quedan en cola; el trabajador del webhook los entrega.
+
+**Límites:** Google permite crear manualmente citas superpuestas. El bot
+detecta esos conflictos y deja de ofrecer el cupo, pero no puede impedir
+escrituras directas de Google. Revisarlos con `agenda_admin.py estado` y los
+logs. Reprogramar automáticamente conserva el profesional/calendario; cambiar
+de profesional o mover un evento entre calendarios requiere gestión humana.
+No hay pantalla de recepción propia en esta etapa.
+
+## Conexión inicial de Google
+
+1. En un proyecto de Google Cloud, habilitar Google Calendar API.
+2. Configurar Google Auth Platform: marca, correo, audiencia externa y usuario
+   de prueba. Crear un cliente OAuth **Aplicación de escritorio**.
+3. Guardar el JSON descargado en `datos/google-oauth.json` (privado e ignorado).
+4. Ejecutar, indicando el correo real de la agencia:
+
+   ```powershell
+   .\.venv\Scripts\python.exe scripts\conectar_google_agenda.py --credenciales datos/google-oauth.json --correo CORREO_DE_LA_AGENCIA
+   ```
+
+5. Autorizar desde el navegador. El retorno usa localhost, `state` y PKCE;
+   valida la cuenta Google elegida y guarda el token en `.env.agenda.local`
+   sin mostrarlo. La conexión no activa producción.
+6. Completar el resto de variables siguiendo `.env.agenda.example`. Si el
+   archivo local ya contiene tokens, **no sobrescribirlo con el ejemplo**.
+7. Comprobar el estado de publicación de OAuth antes de entregar. Las apps
+   externas en Testing emiten refresh tokens de siete días para Calendar.
+   Resolver publicación/verificación aplicable; contemplar revocación y reconexión.
+   Al 15/09/2026 la app sigue en **Prueba**: «Publicar app» está deshabilitado
+   hasta completar la página de marca. Que un token ya emitido en Testing se
+   extienda solo al publicar no está documentado: después de publicar, volver
+   a ejecutar `conectar_google_agenda.py` para emitir uno nuevo.
+
+Un `403 access_denied` durante la autorización significa que la cuenta no
+está en **Usuarios de prueba**, no que falten permisos. Y si `calendar.events`
+no aparece en el selector de alcances, falta habilitar Calendar API en ese
+proyecto: el recuadro «Agrega permisos manualmente» acepta el alcance, pero
+habilitar la API es un paso aparte y sin él las llamadas devuelven 403.
+
+Se solicita `calendar.events` más identidad básica para comprobar la cuenta.
+El backend restringe el uso a los calendarios configurados. El perfil de
+Smarth House usa `primary`; confirmar su destino en una prueba aislada antes
+de activarlo. Un calendario dedicado permite separar citas de asuntos personales.
+
+Documentación: [OAuth Desktop y PKCE](https://developers.google.com/identity/protocols/oauth2/native-app),
+[caducidad de tokens](https://developers.google.com/identity/protocols/oauth2#expiration),
+[creación e IDs de eventos](https://developers.google.com/workspace/calendar/api/guides/create-events),
+[versiones de recursos](https://developers.google.com/workspace/calendar/api/guides/version-resources).
+
+## Plantilla de WhatsApp y recordatorios
+
+Fuera de la ventana de atención no alcanza un mensaje libre: configurar una
+plantilla **UTILITY** aprobada y sincronizada en la bandeja de Chatwoot.
+Nombre sugerido: `actualizacion_cita`. Idioma inicial: `es`, debe coincidir
+exactamente con el aprobado. Cuerpo esperado, con cinco variables:
+
+```text
+Actualización de tu cita con {{1}}: {{2}}. Fecha y hora: {{3}}. Referencia: {{4}}. Información: {{5}}.
+```
+
+Variables: negocio, estado del aviso, fecha/hora/zona, referencia y enlace o
+indicación de contacto. La plantilla se valida en la bandeja real; su nombre
+en el `.env` no implica que Meta la haya aprobado.
+
+Configurar `AGENDA_PLANTILLA_WHATSAPP` y `AGENDA_PLANTILLA_IDIOMA` al verificarla.
+Sin plantilla, los avisos fuera de ventana quedan bloqueados en la cola.
+La propuesta informa que se enviarán recordatorios. La persona puede escribir
+`SIN RECORDATORIOS` para desactivarlos o `ACTIVAR RECORDATORIOS` para reactivarlos.
+Cancelar recordatorios conserva las citas y sus confirmaciones operativas.
+
+Referencias: [API de mensajes y plantillas de Chatwoot](https://developers.chatwoot.com/api-reference/messages/create-new-message),
+[ventana por canal](https://developers.chatwoot.com/self-hosted/supported-features).
+
+## Preparación y despliegue
+
+1. Configurar una base propia para la agenda de Smarth House con rol limitado,
+   copia de seguridad y host Docker interno. No cambiar el DSN de la memoria
+   existente ni reutilizar sus tablas. `AGENDA_DSN` debe ser PostgreSQL en producción.
+2. Probar contra calendario dedicado y bandeja de pruebas, sin prospectos reales.
+3. Verificar alta, Meet, cambio, cancelación, sincronización de recepción,
+   confirmaciones, recordatorios y entrega de plantillas fuera de ventana.
+4. Configurar las variables de agenda solo en runtime en `agente-ia`.
+5. Comprobar autodespliegue e historial antes del push. Integrar a `main`
+   únicamente el cambio probado y desplegar con `scripts/desplegar.py`,
+   indicando `--prompt prompts/smarth_house_portal.md`.
+6. Verificar `/salud`, huella de reglas de agenda, comportamiento y envío real.
+   Guardar commit, ID de despliegue y alcance de la validación en operación.
+
+El usuario autorizó el despliegue de Smarth House para este trabajo. Los pasos
+de conexión de Google y aprobación de Meta son requisitos externos; no
+activarlos con valores ficticios ni presentar pruebas simuladas como producción.
+
+## Pruebas
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+En la máquina del usuario, Norton re-firma todo el tráfico TLS con una raíz
+propia que está en el almacén de Windows pero no en `certifi`. Por eso el
+código que usa `urllib` funciona —incluido `calendario_google.py`— y el que
+usa `httpx` falla con `CERTIFICATE_VERIFY_FAILED`, lo que alcanza a los
+proveedores de IA. En scripts locales que llamen al modelo, empezar con
+`import truststore; truststore.inject_into_ssl()`; el paquete ya está en el
+entorno. No desactivar la verificación. No afecta al contenedor del VPS.
+
+PostgreSQL opcional: `AGENDA_PROBAR_POSTGRES=1` habilita el contrato de agenda
+en la base aislada `catalogos_pruebas`, usando la conexión privada existente
+de `.env.portal.local`. Cada prueba usa un negocio aleatorio y limpia solo
+sus filas de agenda. No ejecuta migraciones del portal ni borra sus tablas.
+
+La suite nueva prueba cupos simultáneos, aislamiento entre contactos y negocios,
+reintentos, recuperación, cambios manuales, plantillas, destinatarios y el
+recorrido del webhook sin llamar al proveedor. Los resultados definitivos
+y las comprobaciones reales se registrarán al completar esta etapa.

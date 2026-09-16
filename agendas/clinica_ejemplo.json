@@ -1,0 +1,22 @@
+{
+  "negocio": "clinica-ejemplo",
+  "nombre": "Clínica de ejemplo — datos ficticios",
+  "zona": "America/Managua",
+  "dias": [0, 1, 2, 3, 4, 5],
+  "apertura": "08:00",
+  "cierre": "17:30",
+  "paso_minutos": 30,
+  "anticipacion_minutos": 60,
+  "horizonte_dias": 60,
+  "recordatorios_minutos": [1440, 60],
+  "cierres": [],
+  "recursos": {
+    "profesional_1": {"nombre": "Profesional 1", "calendario": "CONFIGURAR_CALENDARIO_1", "capacidad": 1},
+    "profesional_2": {"nombre": "Profesional 2", "calendario": "CONFIGURAR_CALENDARIO_2", "capacidad": 1},
+    "profesional_3": {"nombre": "Profesional 3", "calendario": "CONFIGURAR_CALENDARIO_3", "capacidad": 1},
+    "profesional_4": {"nombre": "Profesional 4", "calendario": "CONFIGURAR_CALENDARIO_4", "capacidad": 1}
+  },
+  "servicios": {
+    "consulta": {"nombre": "Consulta de ejemplo", "minutos": 30, "recursos": ["profesional_1", "profesional_2", "profesional_3", "profesional_4"], "meet": false}
+  }
+}

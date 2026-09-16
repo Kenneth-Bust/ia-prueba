@@ -129,6 +129,7 @@ def herramientas_para(
     portal_clave_bot: str = "",
     portal_negocio_id: str = "",
     portal_linea: str = "",
+    agenda=None,
 ) -> list:
     """Herramientas comunes más las de catálogo habilitadas para este bot.
 
@@ -136,6 +137,9 @@ def herramientas_para(
     herramientas locales de otro negocio aunque el llamador les pase rutas.
     """
     disponibles = list(HERRAMIENTAS)
+    if agenda is not None:
+        from .agenda import herramientas_agenda
+        disponibles.extend(herramientas_agenda(agenda))
     if portal_url and portal_clave_bot:
         disponibles.extend(crear_herramientas_portal(
             portal_url, portal_clave_bot, negocio_id=portal_negocio_id, linea=portal_linea,

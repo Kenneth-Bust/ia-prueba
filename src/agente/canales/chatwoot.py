@@ -360,6 +360,52 @@ class Chatwoot(Canal):
         """Los datos de la cuenta. Sirve para avisar al arrancar con cuál se habla."""
         return self._api("GET", "conversations?status=open&page=1")
 
+    def enviar_aviso_agenda(self, envio, contacto, cita, plantilla, idioma, *, recuperar=False):
+        """Entrega avisos persistentes, verificando destinatario y ventana de WhatsApp."""
+        from ..agenda_modelo import ErrorDeAgenda
+        conversacion = str(envio["conversacion"])
+        if not conversacion.isdigit() or contacto["cuenta"] != self.cuenta_id:
+            raise ErrorDeAgenda("El aviso no pertenece a esta cuenta.")
+        actual = self._api("GET", f"conversations/{conversacion}")
+        remitente = (actual.get("meta") or {}).get("sender") or {}
+        if (str(actual.get("inbox_id")) != contacto["bandeja"]
+                or f"{self.cuenta_id}:{remitente.get('id')}" != contacto["contacto"]
+                or (self.bandeja_id and contacto["bandeja"] != self.bandeja_id)):
+            raise ErrorDeAgenda("La conversación ya no coincide con el destinatario del aviso.")
+        camino = f"conversations/{conversacion}/messages"
+        if recuperar:
+            # La API de mensajes no ofrece una clave idempotente garantizada.
+            # Si el POST perdió su respuesta, buscamos la marca; nunca reenviamos a ciegas.
+            pagina = self._api("GET", camino)
+            for mensaje in pagina.get("payload", []):
+                if (mensaje.get("content_attributes") or {}).get("agenda_envio_id") == envio["id"]:
+                    return mensaje
+            return None
+        datos = {"content": envio["texto"], "message_type": "outgoing", "private": False,
+                 "content_attributes": {"agenda_envio_id": envio["id"]}}
+        if actual.get("can_reply") is not True:
+            if not plantilla:
+                raise ErrorDeAgenda("El aviso necesita una plantilla de WhatsApp aprobada.")
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            zona = cita.get("zona", "America/Managua")
+            fecha = datetime.fromtimestamp(cita["inicio"], ZoneInfo(zona)).strftime("%d/%m/%Y %H:%M") + " " + zona
+            estado = {"alta": "confirmada", "mover": "reprogramada", "cancelar": "cancelada", "enlace": "enlace disponible"}.get(envio["tipo"], "recordatorio")
+            if envio["tipo"].startswith("error"):
+                estado = "cambio pendiente de revisión por el equipo"
+            informacion = cita.get("enlace") if cita["estado"] == "confirmada" else "Respondé para consultar al equipo"
+            parametros = {"1": cita.get("negocio_nombre", "nuestro equipo"), "2": estado,
+                          "3": fecha, "4": cita["id"], "5": informacion or "Respondé para consultar al equipo"}
+            datos["content"] = (f"Actualización de tu cita con {parametros['1']}: {parametros['2']}. "
+                                f"Fecha y hora: {parametros['3']}. Referencia: {parametros['4']}. "
+                                f"Información: {parametros['5']}.")
+            datos["template_params"] = {"name": plantilla, "category": "UTILITY", "language": idioma,
+                                        "processed_params": {"body": parametros}}
+        respuesta = self._api("POST", camino, datos)
+        if not respuesta.get("id") or respuesta.get("status") == "failed":
+            raise ErrorDeAgenda("Chatwoot no aceptó el aviso de agenda.")
+        return respuesta
+
     def _api(self, metodo: str, camino: str, datos: dict | None = None) -> dict:
         """Una llamada a la API de Chatwoot."""
         url = f"{self.url}/api/v1/accounts/{self.cuenta_id}/{camino}"

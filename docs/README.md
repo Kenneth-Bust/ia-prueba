@@ -13,6 +13,8 @@ decisiones y pruebas anteriores; no describen por sí solos qué corre hoy.
 | [Actualización de Smarth House](despliegue-smarth-portal.md) | Evidencias de su migración al portal y pendientes operativos |
 | [Piloto actual](piloto-demo.md) | Estado de la demo de uniformes y sus recursos |
 | [Plan de uniformes](demo-uniformes-plan.md) | Requisitos y trabajo pendiente del prospecto de dos números |
+| [Agenda y Google Calendar](agenda.md) | Implementación local para Smarth House, conexión, operación y pendientes antes del despliegue |
+| [Propuesta inicial de agenda](agenda-google-calendar-plan.md) | Requisitos originales del cliente y diseño que dio paso a la implementación |
 
 Contexto para agentes: [AGENTS.md](../AGENTS.md).
 Documentación histórica: [archivo](archivo/README.md).

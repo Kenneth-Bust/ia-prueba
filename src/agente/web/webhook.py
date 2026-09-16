@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager
 from time import monotonic
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..agente import Agente
 from ..canales.buffer import BufferDeMensajes
@@ -71,6 +71,7 @@ def crear_app(
     # queremos: adentro tiene la conexión a Postgres, y armarlo por mensaje
     # sería abrir una conexión nueva cada vez.
     agente = agente or Agente(config)
+    agenda = getattr(agente, "agenda", None)
 
     # Un candado por conversación. Dos personas distintas se atienden a la
     # vez sin problema, pero dos mensajes de la MISMA persona no: si se
@@ -88,6 +89,28 @@ def crear_app(
         # reloj, aunque espere mientras terminamos de contestar esta.
         recibido_en = recibidos_en.pop(conversacion, monotonic())
         async with candados[conversacion]:
+            if agenda is not None:
+                from ..agenda import CONFIRMACION
+                from ..agenda_modelo import ErrorDeAgenda
+                opcion = texto.strip().lower().rstrip(".!")
+                if opcion in ("sin recordatorios", "no recordatorios", "activar recordatorios"):
+                    aviso = await asyncio.to_thread(agenda.permitir_recordatorios, conversacion, opcion == "activar recordatorios")
+                    await asyncio.to_thread(canal.enviar, conversacion, [aviso])
+                    return
+                confirmacion = CONFIRMACION.fullmatch(texto.strip())
+                if confirmacion:
+                    try:
+                        referencia = await asyncio.to_thread(agenda.confirmar, conversacion, confirmacion[1])
+                        await asyncio.to_thread(agenda.enviar_pendientes, canal,
+                                               config.agenda_plantilla_whatsapp, config.agenda_plantilla_idioma)
+                        with agenda.repo.transaccion() as db:
+                            cita = db.obtener("cita", referencia)
+                        if cita.get("pendiente"):
+                            await asyncio.to_thread(canal.enviar, conversacion,
+                                ["Estoy verificando el cambio con Google Calendar. Te enviaré la confirmación cuando termine."])
+                    except ErrorDeAgenda as error:
+                        await asyncio.to_thread(canal.enviar, conversacion, [str(error)])
+                    return
             registro.info(
                 "[%s] %s%s",
                 conversacion,
@@ -163,10 +186,29 @@ def crear_app(
             "Postgres" if config.modo == "produccion" else "SQLite",
             config.buffer_segundos,
         )
+        tarea_agenda = None
+        detener_agenda = asyncio.Event()
+        if agenda is not None:
+            async def mantener_agenda():
+                while not detener_agenda.is_set():
+                    try:
+                        await asyncio.to_thread(agenda.trabajar, canal,
+                                               config.agenda_plantilla_whatsapp, config.agenda_plantilla_idioma)
+                    except Exception as error:
+                        # Una caída externa no apaga WhatsApp. Las operaciones quedan en la base.
+                        registro.error("Agenda pendiente de recuperación: %s", type(error).__name__)
+                    try:
+                        await asyncio.wait_for(detener_agenda.wait(), timeout=30)
+                    except asyncio.TimeoutError:
+                        pass
+            tarea_agenda = asyncio.create_task(mantener_agenda())
         yield
         # Al desplegar no agregamos una demora artificial al vaciado: el
         # servidor tiene un plazo limitado para cerrar sin perder mensajes.
         cerrando = True
+        detener_agenda.set()
+        if tarea_agenda is not None:
+            await tarea_agenda
         # Al apagar, soltamos lo que estaba esperando. Sin esto, un deploy
         # justo en esos segundos se come la ráfaga de alguien.
         await buffer.vaciar()
@@ -174,6 +216,111 @@ def crear_app(
     app = FastAPI(title="Agente - webhook de Chatwoot", lifespan=ciclo_de_vida)
 
     # -- Las rutas -------------------------------------------------------------
+
+    # Google exige una página principal y una política de privacidad públicas,
+    # en el dominio autorizado, para publicar la app de OAuth. Van acá y no en
+    # el portal porque este contenedor ya es el que responde en ese dominio:
+    # así son una sola cosa para desplegar. Son de lectura y no tocan el
+    # webhook de Chatwoot.
+    CORREO_CONTACTO = "joelitocruz5@gmail.com"
+
+    def _pagina(titulo: str, cuerpo: str) -> HTMLResponse:
+        return HTMLResponse(
+            "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{titulo} · Smarth House</title><style>"
+            "body{font:16px/1.6 system-ui,sans-serif;max-width:46rem;margin:0 auto;"
+            "padding:2rem 1rem;color:#1a1a1a;background:#fff}"
+            "h1{font-size:1.6rem}h2{font-size:1.1rem;margin-top:2rem}"
+            "a{color:#0b57d0}footer{margin-top:3rem;font-size:.85rem;color:#555}"
+            "</style></head><body>" + cuerpo +
+            "<footer>Smarth House · Nicaragua · "
+            f"<a href='mailto:{CORREO_CONTACTO}'>{CORREO_CONTACTO}</a><br>"
+            "<a href='/'>Inicio</a> · <a href='/privacidad'>Privacidad</a> · "
+            "<a href='/terminos'>Términos</a></footer></body></html>"
+        )
+
+    @app.get("/", response_class=HTMLResponse)
+    async def inicio() -> HTMLResponse:
+        return _pagina("Asistente de agenda", """
+<h1>Smarth House · Asistente de agenda</h1>
+<p>Smarth House es una agencia nicaragüense que configura asistentes de IA para
+atender el WhatsApp de otros negocios. Este servicio atiende las consultas que
+llegan por WhatsApp y coordina las demostraciones por videollamada.</p>
+<p>Cuando una persona pide una demostración, el asistente consulta los horarios
+disponibles, le propone opciones y —solo después de que ella lo confirma por
+escrito— registra la cita en el calendario de Google del negocio y le envía la
+confirmación con el enlace de la videollamada por WhatsApp.</p>
+<h2>Permisos de Google que utiliza</h2>
+<p>El asistente usa <code>calendar.events</code> para crear, mover y cancelar
+las citas en el calendario del negocio, y la identidad básica de la cuenta
+(<code>openid</code>, <code>email</code>) solo para verificar que la cuenta
+autorizada es la correcta. No accede a ningún otro dato de Google.</p>
+<p>Para consultas: <a href='mailto:""" + CORREO_CONTACTO + "'>" + CORREO_CONTACTO + "</a>.</p>")
+
+    @app.get("/privacidad", response_class=HTMLResponse)
+    async def privacidad() -> HTMLResponse:
+        return _pagina("Política de privacidad", """
+<h1>Política de privacidad</h1>
+<p>Describe cómo Smarth House trata los datos personales en su asistente de
+agenda por WhatsApp.</p>
+<h2>Qué datos tratamos</h2>
+<p><strong>De la cuenta de Google que autoriza el servicio:</strong> su
+dirección de correo verificada, únicamente para comprobar que la cuenta
+autorizada es la correcta, y el acceso a los eventos de su calendario para
+crear, modificar y cancelar las citas que gestiona el asistente.</p>
+<p><strong>De quien agenda por WhatsApp:</strong> el nombre que indica para la
+cita, el identificador de su conversación y su contacto en el sistema de
+atención, y la fecha, la hora y la referencia de la cita.</p>
+<h2>Para qué los usamos</h2>
+<p>Exclusivamente para gestionar las citas: proponer horarios, confirmarlas,
+reprogramarlas, cancelarlas y enviar los avisos correspondientes por WhatsApp.
+No se usan para publicidad ni para elaborar perfiles.</p>
+<h2>Qué no pedimos ni guardamos</h2>
+<p>No solicitamos ni almacenamos contraseñas de Google, datos de tarjetas o
+cuentas bancarias, ni información de salud. El asistente no pide claves ni
+códigos de verificación.</p>
+<h2>Uso de los datos de las API de Google</h2>
+<p>El uso que Smarth House hace de la información recibida de las API de Google
+se ajusta a la
+<a href='https://developers.google.com/terms/api-services-user-data-policy'>Política
+de Datos de Usuario de los Servicios de API de Google</a>, incluidos sus
+requisitos de uso limitado. La información del calendario se usa solo para
+prestar la función de agenda visible para el usuario, no se transfiere a
+terceros salvo lo necesario para prestarla, y no se utiliza para publicidad.</p>
+<h2>Con quién se comparten</h2>
+<p>Con Google, para registrar los eventos en el calendario, y con Meta a través
+de nuestro sistema de atención, para entregar los mensajes de WhatsApp. No se
+venden ni se ceden a terceros con otros fines.</p>
+<h2>Conservación y derechos</h2>
+<p>Las citas y sus avisos se conservan mientras sean necesarios para la gestión
+de la agenda y el registro de lo acordado. Podés pedir el acceso, la
+rectificación o la baja de tus datos, y revocar en cualquier momento el acceso
+de esta aplicación a tu cuenta de Google desde
+<a href='https://myaccount.google.com/permissions'>los permisos de tu cuenta</a>.</p>
+<p>Para ejercer esos derechos, escribinos a
+<a href='mailto:""" + CORREO_CONTACTO + "'>" + CORREO_CONTACTO + """</a>.</p>""")
+
+    @app.get("/terminos", response_class=HTMLResponse)
+    async def terminos() -> HTMLResponse:
+        return _pagina("Términos del servicio", """
+<h1>Términos del servicio</h1>
+<h2>Qué ofrece</h2>
+<p>El asistente de Smarth House responde consultas por WhatsApp y coordina
+citas para demostraciones por videollamada. Una propuesta de horario no es una
+cita reservada: la reserva existe cuando la persona la confirma por escrito y
+el sistema devuelve su referencia.</p>
+<h2>Uso aceptable</h2>
+<p>El servicio es para coordinar citas legítimas. No debe usarse para enviar
+contenido ilícito, suplantar a otra persona ni interferir con su
+funcionamiento. Podemos suspender la atención automática ante un uso abusivo.</p>
+<h2>Disponibilidad y límites</h2>
+<p>El asistente depende de servicios de terceros (WhatsApp, Google Calendar) y
+puede no estar disponible en algún momento. No garantizamos ausencia de errores
+ni un tiempo de respuesta determinado. Las citas pueden ser reprogramadas o
+canceladas por cualquiera de las partes; los cambios se avisan por WhatsApp.</p>
+<h2>Contacto</h2>
+<p>Consultas y reclamos: <a href='mailto:""" + CORREO_CONTACTO + "'>" + CORREO_CONTACTO + "</a>.</p>")
 
     @app.get("/salud")
     async def salud() -> dict:
@@ -201,6 +348,9 @@ def crear_app(
             resultado["reglas_catalogo_sha256"] = hashlib.sha256(
                 REGLA_CATALOGO.encode("utf-8")
             ).hexdigest()
+        if agenda is not None:
+            resultado["agenda"] = "habilitada"
+            resultado["agenda_reglas_sha256"] = hashlib.sha256(config.agenda_reglas_ruta.read_bytes()).hexdigest()
         return resultado
 
     @app.post("/chatwoot/{token}")
@@ -226,6 +376,16 @@ def crear_app(
             # No es un error: es la mayoría de lo que llega. Cada respuesta
             # que manda el propio agente vuelve como un evento más.
             return JSONResponse({"estado": "ignorado"})
+
+        if agenda is not None:
+            from ..agenda_modelo import ErrorDeAgenda
+            conversacion = evento.get("conversation") or {}
+            remitente = evento.get("sender") or (conversacion.get("meta") or {}).get("sender") or {}
+            try:
+                await asyncio.to_thread(agenda.registrar_contacto, entrante.conversacion,
+                                       remitente.get("id"), config.chatwoot_cuenta_id, config.chatwoot_bandeja_id)
+            except ErrorDeAgenda:
+                return JSONResponse({"error": "contacto no verificable"}, status_code=400)
 
         # Se suma a la ráfaga y contestamos ya. Lo que sigue pasa solo.
         recibidos_en[entrante.conversacion] = monotonic()

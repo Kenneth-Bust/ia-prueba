@@ -1,0 +1,19 @@
+{
+  "negocio": "smarth-house",
+  "nombre": "Smarth House",
+  "zona": "America/Managua",
+  "dias": [0, 1, 2, 3, 4, 5],
+  "apertura": "08:00",
+  "cierre": "17:30",
+  "paso_minutos": 30,
+  "anticipacion_minutos": 60,
+  "horizonte_dias": 60,
+  "recordatorios_minutos": [1440, 60],
+  "cierres": [],
+  "recursos": {
+    "asesor": {"nombre": "Asesor de Smarth House", "calendario": "primary", "capacidad": 1}
+  },
+  "servicios": {
+    "demo": {"nombre": "Demo por videollamada", "minutos": 30, "recursos": ["asesor"], "meet": true}
+  }
+}
