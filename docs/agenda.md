@@ -2,11 +2,15 @@
 
 ## Estado
 
-Desarrollo iniciado el 15/09/2026, rama `funcionalidad/agenda-google-calendar`,
-partiendo de `9bf6a89`. El usuario pidió implementarlo y desplegarlo primero
-en Smarth House. **Todavía no está desplegado**, pero ya no es solo código:
-el 15/09/2026 se conectó Google y se validó el circuito completo contra la
-API real. No crear cuentas ni recursos para la clínica sin su aceptación.
+Desarrollado el 15/09/2026 en `funcionalidad/agenda-google-calendar`,
+partiendo de `9bf6a89`. **Desplegado en producción ese mismo día** como
+`be1df75`: `agente-ia` corre con `agenda: habilitada` y atiende WhatsApp real.
+El registro del despliegue, con identificadores y huellas, está en
+[operacion.md](operacion.md#registro-de-despliegues-verificados).
+
+Falta la prueba funcional con un contacto real por WhatsApp: `/salud` confirma
+que la agenda cargó, no que una reserva completa funcione. No crear cuentas ni
+recursos para la clínica sin su aceptación.
 
 ### Verificado el 15/09/2026 contra Google real
 
@@ -27,20 +31,27 @@ Suite completa: 441 pasaron, 34 salteados. El usuario eligió el calendario
 personal y cualquier evento suyo ocupa el cupo. Para la clínica corresponde
 revisar esa decisión, porque ahí son cuatro calendarios y datos de pacientes.
 
-### Pendiente antes de desplegar
+### Estado de los requisitos
 
-1. **PostgreSQL propio de la agenda.** `MODO=produccion` rechaza cualquier DSN
-   que no sea Postgres (`config.py`). El DSN va con el host interno de Docker.
-2. **Plantilla de WhatsApp aprobada.** Solo afecta a los avisos fuera de la
-   ventana de 24 h, es decir los recordatorios. La confirmación inmediata sale
-   como mensaje normal porque la conversación está abierta.
-3. **Publicar la app de OAuth.** En Testing el refresh token vence a los siete
-   días. Publicar exige completar antes la página de marca.
-4. **Verificar `PROMPT_SISTEMA` en el servidor.** Un valor viejo se traduce en
-   silencio al prompt archivado (`config.ruta_del_prompt()`): el bot tendría
-   las herramientas de agenda y un prompt que no sabe que existen.
-5. **Cargar las siete variables de agenda de una sola vez.** Si quedan a medias,
-   la validación de `config.py` impide arrancar el contenedor.
+1. ~~**PostgreSQL propio de la agenda.**~~ Hecho: base `agenda_smarth` con rol
+   propio dentro del Postgres existente, host interno `1hrm4idgdx20aqz5grz12fqb`.
+   Con la IP pública el contenedor no se alcanza a sí mismo.
+2. **Plantilla de WhatsApp aprobada: pendiente.** Solo afecta a los avisos
+   fuera de la ventana de 24 h, es decir los recordatorios, que quedan
+   `bloqueado` en la cola. La confirmación inmediata sale como mensaje normal
+   porque la conversación está abierta ([chatwoot.py](../src/agente/canales/chatwoot.py)
+   solo exige plantilla cuando `can_reply` es falso).
+3. **Publicar la app de OAuth: pendiente.** En estado de prueba el refresh
+   token vence a los siete días. El dominio ya está verificado en Search
+   Console; falta completar la página de marca. No subir un logotipo: obliga a
+   pasar por verificación. Después de publicar hay que volver a ejecutar
+   `conectar_google_agenda.py` para emitir un token sin vencimiento.
+4. ~~**Verificar `PROMPT_SISTEMA` en el servidor.**~~ Confirmado en Coolify:
+   `prompts/smarth_house_portal.md`. Un valor viejo se traduce en silencio al
+   prompt archivado (`config.ruta_del_prompt()`) y dejaría al bot con las
+   herramientas de agenda y un prompt que no sabe que existen.
+5. ~~**Cargar las siete variables de una sola vez.**~~ Hecho. Si quedan a
+   medias, la validación de `config.py` impide arrancar el contenedor.
 
 La configuración aprobada de Smarth House es:
 

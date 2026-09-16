@@ -92,9 +92,11 @@ el 15/09/2026 en `funcionalidad/agenda-google-calendar`: el bot consulta cupos,
 reserva, cancela y reprograma citas reales en Google Calendar, con enlace de
 Meet. Smarth House la usa para sus demos por videollamada.
 
-- **Conectada y verificada contra Google real**, no simulada: alta, cambio,
-  cancelación, detección de bajas hechas a mano en el calendario y una
-  conversación completa con el modelo. Está **desplegada: no**.
+- **Desplegada en producción el 15/09/2026** como `be1df75`. `/salud` responde
+  `agenda: habilitada`. Verificada contra Google real, no simulada: alta,
+  cambio, cancelación, detección de bajas hechas a mano en el calendario y una
+  conversación completa con el modelo. **Falta la prueba con un contacto real
+  por WhatsApp.**
 - **La confirmación no la ejecuta el modelo.** Las herramientas devuelven una
   propuesta con su referencia; el webhook procesa el `CONFIRMAR` explícito.
   No tratar una propuesta como cita reservada.

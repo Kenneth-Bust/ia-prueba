@@ -334,6 +334,52 @@ dentro del plazo ni reutilizar el precio del historial como oferta vigente.
 
 ## Registro de despliegues verificados
 
+### 15/09/2026 — Agenda de citas con Google Calendar
+
+Se publicó `be1df75` en `main` y se desplegó únicamente `agente-ia` con
+`scripts/desplegar.py`. **El autodespliegue no se disparó con el push**: se
+comprobó nueve veces en tres minutos contra `/salud` antes de lanzarlo a mano,
+para no crear un despliegue duplicado.
+
+| Evidencia | Valor verificado |
+|---|---|
+| Commit desplegado | `be1df756e3ae8636d8ba3513ea94e62de0e1c146` |
+| ID del despliegue en Coolify | `4aobo5pf4z6fiurtjhdtw78z` |
+| Estado del despliegue | `finished` |
+| Salud pública | `estado: ok`, `agenda: habilitada` |
+| SHA-256 del prompt efectivo | `fa5af0234cb9cb2832389a0baffae7c0419faa0c46d415d57a374cc8afce9a17` |
+| SHA-256 de las reglas de agenda | `5e7c3e8e3955a13c081874d3e2142652b1f12ed5d0b1018b7ac49597bee188d4` |
+| Reglas del catálogo | `65deb39c…`, sin cambios |
+| Pruebas automáticas | 468 aprobadas, 34 omitidas, con modelos falsos |
+
+Las dos huellas se compararon contra el contenido guardado en Git, no contra
+la copia de trabajo: en Windows los archivos tienen CRLF y el contenedor lee
+la versión con LF, así que los bytes difieren aunque el contenido sea el
+mismo. La del prompt además se calcula sobre el texto ya recortado por
+`leer_prompt()`, no sobre los bytes del archivo.
+
+**Recursos creados.** Base `agenda_smarth` con rol propio dentro del Postgres
+existente (`1hrm4idgdx20aqz5grz12fqb`), sin tocar la base de las memorias. La
+cuenta de Google autorizada es la de la agencia y el calendario configurado es
+su `primary`: las demos conviven con la agenda personal del dueño. Para la
+clínica corresponde revisar esa decisión.
+
+**Comprobado contra la API real** antes de desplegar: alta con enlace de Meet,
+reprogramación conservando el mismo `evento_id`, cancelación, detección de una
+baja hecha a mano en Google con anulación de los recordatorios pendientes, y
+una conversación completa con Gemini donde el modelo consultó disponibilidad
+antes de responder sin inventar horarios.
+
+**No comprobado todavía:** una reserva completa por WhatsApp con un contacto
+real. `/salud` confirma que la agenda cargó, no que el circuito con un cliente
+funcione. **Pendientes:** la plantilla UTILITY de Meta no está aprobada, así
+que los avisos fuera de la ventana de 24 h —los recordatorios— quedan
+bloqueados en la cola; la confirmación inmediata sí sale porque la
+conversación está abierta. La app de OAuth sigue en estado de prueba y su
+refresh token vence a los siete días: el dominio ya está verificado en Search
+Console y falta completar la marca y publicarla. Detalle en
+[agenda.md](agenda.md).
+
 ### 14/09/2026 — Catálogo del portal, fotos y respuestas progresivas
 
 Integración inicial `45bdb54`, desplegada en agente-ia como
