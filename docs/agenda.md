@@ -3,14 +3,16 @@
 ## Estado
 
 Desarrollado el 15/09/2026 en `funcionalidad/agenda-google-calendar`,
-partiendo de `9bf6a89`. **Desplegado en producción ese mismo día** como
-`be1df75`: `agente-ia` corre con `agenda: habilitada` y atiende WhatsApp real.
+partiendo de `9bf6a89`. **Desplegado y probado por WhatsApp**; la revisión
+vigente es `c0a6b3c`: `agente-ia` corre con agenda, asistencia y confirmación
+sencilla habilitadas y atiende WhatsApp real.
 El registro del despliegue, con identificadores y huellas, está en
 [operacion.md](operacion.md#registro-de-despliegues-verificados).
 
-Falta la prueba funcional con un contacto real por WhatsApp: `/salud` confirma
-que la agenda cargó, no que una reserva completa funcione. No crear cuentas ni
-recursos para la clínica sin su aceptación.
+La prueba funcional real creó la cita, el enlace de Meet y confirmó asistencia
+con las respuestas `CONFIRMAR` y `CONFIRMO ASISTENCIA`. Falta comprobar la
+entrega del recordatorio a su hora. No crear cuentas ni recursos para la clínica
+sin su aceptación.
 
 ### Verificado el 15/09/2026 contra Google real
 
@@ -26,7 +28,8 @@ cliente OAuth de escritorio, alcances `calendar.events`, `userinfo.email` y
 | Baja hecha a mano en Google | `sincronizar()` la detecta, cancela la cita, **anula los recordatorios pendientes** y encola el aviso de cancelación. |
 | Conversación real (Gemini) | El modelo llamó a `consultar_disponibilidad` antes de cada respuesta y a `agendar_cita` con la fecha ISO; no inventó horarios. La propuesta se devolvió literal y la confirmación la ejecutó el servidor. |
 
-Suite completa: 441 pasaron, 34 salteados. El usuario eligió el calendario
+Suite completa: 492 pasaron, 50 salteados; cinco casos críticos adicionales
+pasaron contra PostgreSQL aislado. El usuario eligió el calendario
 `primary` de esa cuenta, no uno dedicado: las demos conviven con su agenda
 personal y cualquier evento suyo ocupa el cupo. Para la clínica corresponde
 revisar esa decisión, porque ahí son cuatro calendarios y datos de pacientes.
@@ -41,11 +44,15 @@ revisar esa decisión, porque ahí son cuatro calendarios y datos de pacientes.
    `bloqueado` en la cola. La confirmación inmediata sale como mensaje normal
    porque la conversación está abierta ([chatwoot.py](../src/agente/canales/chatwoot.py)
    solo exige plantilla cuando `can_reply` es falso).
-3. **Publicar la app de OAuth: pendiente.** En estado de prueba el refresh
-   token vence a los siete días. El dominio ya está verificado en Search
-   Console; falta completar la página de marca. No subir un logotipo: obliga a
-   pasar por verificación. Después de publicar hay que volver a ejecutar
-   `conectar_google_agenda.py` para emitir un token sin vencimiento.
+3. ~~**Publicar la app de OAuth.**~~ Hecho el 15/09/2026: dominio verificado en
+   Search Console y estado **En producción**. Google pide verificación pero no
+   es necesaria para operar: solo quita la pantalla de «app no verificada», que
+   ve únicamente quien autoriza. El límite de 100 usuarios es por ciclo de vida
+   del proyecto y se gasta a razón de una cuenta por cliente. **Queda pendiente
+   reemitir el token**: el que está en uso se emitió en modo prueba y que herede
+   la vigencia de producción no está documentado. Reconectar con
+   `conectar_google_agenda.py` y actualizar `AGENDA_GOOGLE_REFRESH_TOKEN` en
+   Coolify. No subir un logotipo: obliga a pasar por verificación.
 4. ~~**Verificar `PROMPT_SISTEMA` en el servidor.**~~ Confirmado en Coolify:
    `prompts/smarth_house_portal.md`. Un valor viejo se traduce en silencio al
    prompt archivado (`config.ruta_del_prompt()`) y dejaría al bot con las
@@ -63,6 +70,49 @@ La configuración aprobada de Smarth House es:
 Supuestos iniciales editables: anticipación mínima de una hora, agenda abierta
 60 días y enlace de Google Meet por cita. La cuenta indicada por el usuario
 se autoriza con OAuth; nunca guardar sus contraseñas en el proyecto.
+
+## Alta de la agenda para un cliente nuevo
+
+**No se repite nada de Google Cloud.** El proyecto, la Calendar API, los tres
+alcances, el cliente OAuth de escritorio con su JSON, las páginas públicas del
+webhook, el dominio verificado y la publicación de la app son de la agencia y
+están hechos desde el 15/09/2026. Como la app está publicada, **tampoco hay que
+agregar la cuenta del cliente como usuario de prueba**.
+
+Por cliente hacen falta cinco cosas:
+
+1. **`agendas/<negocio>.json`** con sus días, horarios, servicios, duración,
+   recursos y calendarios. Si ese bot además usa portal, el `negocio` del
+   archivo debe coincidir con su `PORTAL_NEGOCIO_ID` o `crear_agenda()` se
+   niega a arrancar.
+2. **Autorizar su cuenta de Google**, indicando el negocio para no pisarle el
+   token a otro cliente:
+
+   ```powershell
+   .\.venv\Scripts\python.exe scripts\conectar_google_agenda.py --credenciales datos/google-oauth.json --correo CORREO_DEL_CLIENTE --negocio NEGOCIO
+   ```
+
+   Guarda en `.env.agenda.<negocio>.local`. Sin `--negocio` escribe en
+   `.env.agenda.local`, que es el de Smarth House.
+3. **Base PostgreSQL propia** con rol limitado. El DSN va con el host interno
+   de Docker, nunca con la IP pública del servidor.
+4. **Aplicación propia en Coolify** con sus siete variables de agenda, cargadas
+   de una sola vez.
+5. **Plantilla UTILITY propia** aprobada en su WhatsApp Business, para los
+   avisos fuera de la ventana de 24 horas.
+
+**Qué cuenta de Google pedirle.** La que sea dueña de los calendarios donde van
+las citas; sirve la del propio negocio y no hace falta crear una nueva. La
+condición real es que **una sola cuenta autorizada pueda escribir en todos los
+calendarios del archivo de reglas**. Para un consultorio de cuatro
+profesionales, lo natural es una cuenta del negocio con cuatro calendarios
+adentro, no cuatro cuentas distintas. `ReglasAgenda` exige que cada recurso
+tenga un calendario **distinto**: dos recursos no pueden compartir uno.
+
+Conviene un calendario dedicado por recurso y no el `primary` de una persona.
+Smarth House usa `primary` por decisión del usuario, así que sus demos conviven
+con su agenda personal y cualquier evento suyo ocupa el cupo. En un negocio con
+datos de pacientes esa decisión debe revisarse.
 
 ## Implementación
 
@@ -87,7 +137,8 @@ conservan las herramientas existentes y la demo se deriva al equipo.
 ### Confirmación antes de modificar
 
 Las herramientas preparan una propuesta con fecha, horario, recurso y nombre.
-La persona escribe `CONFIRMAR <referencia>` para ejecutarla. La propuesta
+La persona responde `CONFIRMAR` para ejecutarla, sin copiar identificadores. El
+servidor recupera la última propuesta de esa conversación. La propuesta
 vence en 15 minutos y no retiene cupos. Al confirmar se valida nuevamente la
 capacidad, dentro de una transacción compartida por todas las conversaciones.
 
@@ -95,8 +146,10 @@ El modelo no tiene una herramienta para ejecutar esa confirmación: el webhook
 procesa el texto explícito y comprueba que la propuesta pertenezca al contacto
 y a la conversación. La respuesta visible de una propuesta sale del resultado
 validado de la herramienta, aunque el modelo redacte después otra cosa.
-Esta primera versión exige esa confirmación escrita, incluso si la solicitud
-inicial llegó por audio. Un «sí» suelto no crea ni cancela citas.
+La confirmación sigue siendo explícita aunque la solicitud inicial llegue por
+audio. También acepta `CONFIRMO` y `SÍ, CONFIRMO`; un «sí» suelto no crea ni
+cancela citas. Repetir la confirmación no duplica el evento. Las referencias
+técnicas quedan en PostgreSQL y en la descripción privada de Google.
 
 Los IDs de contacto provienen del webhook autenticado; no son argumentos que
 pueda inventar el modelo. Una conversación nueva del mismo contacto puede
@@ -221,6 +274,12 @@ La propuesta informa que se enviarán recordatorios. La persona puede escribir
 `SIN RECORDATORIOS` para desactivarlos o `ACTIVAR RECORDATORIOS` para reactivarlos.
 Cancelar recordatorios conserva las citas y sus confirmaciones operativas.
 
+Smarth House programa WhatsApp 24 horas y una hora antes. El aviso de 30 minutos
+que muestra Google Calendar es la notificación predeterminada del calendario al
+dueño de la cuenta; no es un mensaje de WhatsApp para el contacto. Si una cita
+se crea después de la hora prevista para uno de sus avisos, ese aviso pasado no
+se programa.
+
 Referencias: [API de mensajes y plantillas de Chatwoot](https://developers.chatwoot.com/api-reference/messages/create-new-message),
 [ventana por canal](https://developers.chatwoot.com/self-hosted/supported-features).
 
@@ -262,7 +321,8 @@ en la base aislada `catalogos_pruebas`, usando la conexión privada existente
 de `.env.portal.local`. Cada prueba usa un negocio aleatorio y limpia solo
 sus filas de agenda. No ejecuta migraciones del portal ni borra sus tablas.
 
-La suite nueva prueba cupos simultáneos, aislamiento entre contactos y negocios,
+La suite prueba cupos simultáneos, aislamiento entre contactos y negocios,
 reintentos, recuperación, cambios manuales, plantillas, destinatarios y el
-recorrido del webhook sin llamar al proveedor. Los resultados definitivos
-y las comprobaciones reales se registrarán al completar esta etapa.
+recorrido del webhook sin llamar al proveedor. Los resultados definitivos y
+las comprobaciones reales están en [operacion.md](operacion.md) y
+[revision-agenda.md](revision-agenda.md).
