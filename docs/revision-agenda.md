@@ -2,17 +2,26 @@
 
 ## Resultado
 
+**Confirmación sencilla desplegada en Smarth House**: commit `c0a6b3c`,
+despliegue `hygjskxg6qw9ouywegefacj5`, finalizado y comprobado con
+`running:healthy`. La salud pública informa `agenda_confirmacion: simple`.
+El recorrido real debe repetirse desde WhatsApp respondiendo únicamente
+`CONFIRMAR`; no se enviaron mensajes automáticos a contactos durante el cambio.
+
 **Correcciones desplegadas en Smarth House**: commit `eeab1fe`, despliegue
 `7athnkohguvmz0whcowisnug`, finalizado y comprobado con `running:healthy`.
 La salud pública informa `agenda_asistencia: habilitada`. La prueba funcional
 completa desde WhatsApp sigue pendiente del usuario.
 
-Validación: **488 pruebas aprobadas, 46 omitidas** en la suite completa; las
+Validación más reciente: **492 pruebas aprobadas, 50 omitidas** en la suite completa; las
 omitidas corresponden a integraciones optativas. Además, **12 pruebas de
 agenda seleccionadas aprobadas en PostgreSQL aislado**, incluida concurrencia
 de cinco solicitudes para cuatro cupos. El caso final de duración y límite
 compartido se volvió a comprobar en PostgreSQL tras optimizar la consulta.
 La lectura del Google Calendar autorizado también respondió correctamente.
+Cinco casos críticos de la confirmación sencilla pasaron también en PostgreSQL
+aislado: última propuesta, aislamiento entre contactos, idempotencia,
+confirmación de asistencia y cancelación segura.
 
 La base implementada permite reservar, reprogramar y cancelar en Google
 Calendar. Mantiene las operaciones pendientes y los avisos en almacenamiento

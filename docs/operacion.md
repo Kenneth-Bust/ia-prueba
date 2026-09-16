@@ -334,6 +334,61 @@ dentro del plazo ni reutilizar el precio del historial como oferta vigente.
 
 ## Registro de despliegues verificados
 
+### 15/09/2026 — Confirmación de agenda sin códigos visibles
+
+Publicado y desplegado únicamente `agente-ia`, commit
+`c0a6b3c0dcd557022ee9c12fad4b08fac3c4182c`. Tras el push se consultó dos
+veces el historial y no apareció un despliegue automático. La solicitud manual
+generó `hygjskxg6qw9ouywegefacj5`, estado `finished`; la aplicación quedó
+`running:healthy`.
+
+`/salud` confirmó `estado: ok`, `agenda: habilitada`,
+`agenda_asistencia: habilitada` y `agenda_confirmacion: simple`, con las mismas
+huellas de prompt y reglas aprobadas. La persona ahora responde solo
+`CONFIRMAR` a la última propuesta de su conversación o `CONFIRMO ASISTENCIA`.
+Los identificadores continúan persistidos para idempotencia y conciliación,
+pero ya no aparecen en propuestas, confirmaciones ni recordatorios normales.
+Los códigos emitidos antes del cambio siguen admitidos por compatibilidad.
+
+Validación: 492 pruebas aprobadas, 50 omitidas; cinco casos críticos pasaron
+además contra PostgreSQL aislado. Se comprobó que repetir `CONFIRMAR` no duplica
+el evento, que otra conversación no puede confirmar la propuesta y que siempre
+se usa la última propuesta vigente. No se enviaron mensajes a contactos durante
+el despliegue. Falta que el usuario repita el recorrido real por WhatsApp.
+
+No se modificaron el piloto, el portal, las memorias ni las etiquetas. Detalle
+funcional en [revision-agenda.md](revision-agenda.md).
+
+### 15/09/2026 — Revisión de asistencia y cupos por tratamiento
+
+Publicado y desplegado solo `agente-ia`, commit
+`eeab1fe6c579a50de3420e2ec5efd3f15ca55e92`, mediante `scripts/desplegar.py`.
+Se comprobó el historial tras el push y durante las pruebas; no apareció
+un despliegue automático. La única solicitud manual generó
+`7athnkohguvmz0whcowisnug`, estado `finished`, aplicación `running:healthy`.
+
+`/salud` confirmó `estado: ok`, `agenda: habilitada`,
+`agenda_asistencia: habilitada`, catálogo de portal y las mismas huellas de
+prompt y reglas de Smarth House que el despliegue de agenda anterior.
+
+La reserva completada se distingue ahora de la asistencia confirmada por
+el contacto. Reprogramar reinicia esa asistencia. Se incorporó un límite
+opcional compartido por tratamiento y se corrigieron el doble conteo de
+horarios superpuestos durante un cambio pendiente y las propuestas cuya
+duración cambió antes de confirmar.
+
+Pruebas: 488 aprobadas, 46 omitidas en la suite; 12 pruebas seleccionadas
+adicionales en PostgreSQL aislado, incluida concurrencia para cuatro cupos.
+Lectura de Google Calendar verificada. Sigue pendiente el recorrido real
+desde WhatsApp del usuario, la plantilla UTILITY y revisar la renovación
+del token emitido durante pruebas. Las notas locales posteriores al primer
+despliegue indican que la app OAuth ya se publicó; no se volvió a verificar
+ese panel durante esta revisión.
+
+Los cambios locales previos de `docs/agenda.md` se conservaron. No se
+desplegaron el piloto ni el portal. Instrucciones y límites de la base clínica:
+[revision-agenda.md](revision-agenda.md).
+
 ### 15/09/2026 — Agenda de citas con Google Calendar
 
 Se publicó `be1df75` en `main` y se desplegó únicamente `agente-ia` con
