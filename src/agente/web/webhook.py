@@ -90,7 +90,7 @@ def crear_app(
         recibido_en = recibidos_en.pop(conversacion, monotonic())
         async with candados[conversacion]:
             if agenda is not None:
-                from ..agenda import CONFIRMACION
+                from ..agenda import CONFIRMACION, ASISTENCIA
                 from ..agenda_modelo import ErrorDeAgenda
                 opcion = texto.strip().lower().rstrip(".!")
                 if opcion in ("sin recordatorios", "no recordatorios", "activar recordatorios"):
@@ -98,6 +98,14 @@ def crear_app(
                     await asyncio.to_thread(canal.enviar, conversacion, [aviso])
                     return
                 confirmacion = CONFIRMACION.fullmatch(texto.strip())
+                asistencia = ASISTENCIA.fullmatch(texto.strip())
+                if asistencia:
+                    try:
+                        aviso = await asyncio.to_thread(agenda.confirmar_asistencia, conversacion, asistencia[1])
+                    except ErrorDeAgenda as error:
+                        aviso = str(error)
+                    await asyncio.to_thread(canal.enviar, conversacion, [aviso])
+                    return
                 if confirmacion:
                     try:
                         referencia = await asyncio.to_thread(agenda.confirmar, conversacion, confirmacion[1])
@@ -350,6 +358,7 @@ canceladas por cualquiera de las partes; los cambios se avisan por WhatsApp.</p>
             ).hexdigest()
         if agenda is not None:
             resultado["agenda"] = "habilitada"
+            resultado["agenda_asistencia"] = "habilitada"
             resultado["agenda_reglas_sha256"] = hashlib.sha256(config.agenda_reglas_ruta.read_bytes()).hexdigest()
         return resultado
 

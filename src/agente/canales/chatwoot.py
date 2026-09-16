@@ -390,10 +390,13 @@ class Chatwoot(Canal):
             from zoneinfo import ZoneInfo
             zona = cita.get("zona", "America/Managua")
             fecha = datetime.fromtimestamp(cita["inicio"], ZoneInfo(zona)).strftime("%d/%m/%Y %H:%M") + " " + zona
-            estado = {"alta": "confirmada", "mover": "reprogramada", "cancelar": "cancelada", "enlace": "enlace disponible"}.get(envio["tipo"], "recordatorio")
+            estado = {"alta": "agendada", "mover": "reprogramada", "cancelar": "cancelada", "enlace": "enlace disponible"}.get(envio["tipo"], "recordatorio")
             if envio["tipo"].startswith("error"):
                 estado = "cambio pendiente de revisión por el equipo"
             informacion = cita.get("enlace") if cita["estado"] == "confirmada" else "Respondé para consultar al equipo"
+            if cita["estado"] == "confirmada" and cita.get("asistencia_codigo") and not envio["tipo"].startswith("error"):
+                from ..agenda import Agenda
+                informacion = ((informacion + " — ") if informacion else "") + Agenda._instruccion_asistencia(cita)
             parametros = {"1": cita.get("negocio_nombre", "nuestro equipo"), "2": estado,
                           "3": fecha, "4": cita["id"], "5": informacion or "Respondé para consultar al equipo"}
             datos["content"] = (f"Actualización de tu cita con {parametros['1']}: {parametros['2']}. "

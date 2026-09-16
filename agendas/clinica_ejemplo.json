@@ -17,6 +17,7 @@
     "profesional_4": {"nombre": "Profesional 4", "calendario": "CONFIGURAR_CALENDARIO_4", "capacidad": 1}
   },
   "servicios": {
-    "consulta": {"nombre": "Consulta de ejemplo", "minutos": 30, "recursos": ["profesional_1", "profesional_2", "profesional_3", "profesional_4"], "meet": false}
+    "consulta": {"nombre": "Consulta de ejemplo", "minutos": 30, "capacidad_simultanea": 4, "recursos": ["profesional_1", "profesional_2", "profesional_3", "profesional_4"], "meet": false},
+    "tratamiento_largo": {"nombre": "Tratamiento de ejemplo", "minutos": 60, "capacidad_simultanea": 2, "recursos": ["profesional_1", "profesional_2", "profesional_3", "profesional_4"], "meet": false}
   }
 }

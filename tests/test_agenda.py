@@ -249,7 +249,7 @@ def test_superposicion_cuenta_simultaneidad_no_cantidad_total():
 
 def test_herramientas_no_exponen_identidad_ni_funcion_de_confirmar(agenda):
     herramientas = herramientas_agenda(agenda)
-    assert len(herramientas) == 5
+    assert len(herramientas) == 6
     for herramienta in herramientas:
         assert not any(k in herramienta.args for k in ("config", "contacto", "conversacion", "calendario"))
     assert not any(h.name == "confirmar_cita" for h in herramientas)

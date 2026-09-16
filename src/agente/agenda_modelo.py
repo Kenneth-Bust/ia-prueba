@@ -70,6 +70,11 @@ class ReglasAgenda:
                     raise ValueError()
                 if not servicio["recursos"] or not set(servicio["recursos"]) <= set(reglas.recursos):
                     raise ValueError()
+                if len(set(servicio["recursos"])) != len(servicio["recursos"]):
+                    raise ValueError()
+                limite = servicio.get("capacidad_simultanea")
+                if "capacidad_simultanea" in servicio and (type(limite) is not int or not 1 <= limite <= 100):
+                    raise ValueError()
             if not reglas.servicios:
                 raise ValueError()
             for dia in reglas.cierres:
