@@ -58,6 +58,26 @@ anterior en pantalla. Se aceptan además `AGÉNDAME` y `AGENDAME`, con o sin
 negrita o cursiva. Queda afuera `agendar` sin pronombre: «quiero agendar» es una
 intención y no debe ejecutar una propuesta viva.
 
+## El bot quedaba mudo al repetir la palabra
+
+La prueba del usuario lo encontró: después de reservar volvió a escribir
+`AGENDARME` y no recibió ninguna respuesta. El servidor reconocía la palabra,
+`confirmar` devolvía la misma referencia por idempotencia, `enviar_pendientes`
+no encontraba avisos nuevos y el webhook cortaba con `return` sin contestar.
+El mensaje tampoco llegaba al modelo, así que la conversación quedaba en
+silencio justo después de reservar, que es cuando la persona más desconfía.
+
+`Agenda.resumen_de_reserva` devuelve ahora el estado de esa cita y el webhook
+lo envía cuando la propuesta ya estaba aceptada. Sigue sin duplicar el evento.
+Una cita en trámite con Google conserva el aviso de espera anterior, y una
+cancelada responde que ya lo está.
+
+## Color del evento en Calendar
+
+Pedido del usuario para leer la grilla sin abrir cada cita: amarillo
+(`colorId` 5) mientras la asistencia está pendiente, verde (`colorId` 10)
+cuando está confirmada. Reprogramar lo devuelve a amarillo junto con el título.
+
 ## Aviso al dueño
 
 El usuario eligió recibirlo por Google Calendar/correo. El código no tiene un

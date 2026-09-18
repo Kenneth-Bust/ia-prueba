@@ -30,6 +30,42 @@ def test_agendarme_autoriza_y_confirmar_sigue_valiendo_para_chats_abiertos(texto
     assert CONFIRMACION.fullmatch(normalizar_comando_agenda(texto))
 
 
+def test_repetir_agendarme_contesta_en_vez_de_dejar_mudo_al_bot(agenda):
+    propuesta(agenda)
+    agente = agente_falso([])
+    agente.agenda = agenda
+    agente.config.chatwoot_bandeja_id = "1"
+    canal = CanalAgenda()
+
+    def mandar(id_mensaje):
+        entrada = evento("AGENDARME", conversacion=1, id_mensaje=id_mensaje)
+        entrada.update(sender={"id": 1, "type": "contact"}, inbox={"id": 1})
+        with cliente(canal, agente) as web:
+            assert web.post("/chatwoot/secreto", json=entrada).status_code == 200
+
+    mandar(1)
+    enviados = len(canal.envios())
+    mandar(2)
+    assert len(canal.envios()) > enviados, "el segundo AGENDARME no puede quedar sin respuesta"
+    assert "ya está agendada" in canal.envios()[-1]
+    assert agenda.google.creaciones == 1
+
+
+def test_el_color_del_evento_sigue_al_estado_de_asistencia(agenda):
+    referencia = reservar(agenda)
+
+    def color():
+        return list(agenda.google.eventos.values())[0]["colorId"]
+
+    assert color() == "5"
+    agenda.confirmar_asistencia("1")
+    assert color() == "10"
+    agenda.proponer("1", "mover", cita_id=referencia, fecha="2026-09-23T10:00")
+    agenda.confirmar("1")
+    assert color() == "5"
+    assert agenda.google.creaciones == 1
+
+
 @pytest.mark.parametrize("texto", ["_Confirmo asistencia_", "**CONFIRMO ASISTENCIA**", "sí, confirmo mi asistencia"])
 def test_asistencia_con_formato_sigue_siendo_explicita(texto):
     assert ASISTENCIA.fullmatch(normalizar_comando_agenda(texto))

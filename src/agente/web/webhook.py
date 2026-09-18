@@ -109,6 +109,14 @@ def crear_app(
                     return
                 if confirmacion:
                     try:
+                        # Repetir la palabra sobre una propuesta ya ejecutada no
+                        # genera avisos nuevos. Sin esta respuesta el webhook
+                        # cortaba en silencio y el bot parecía caído.
+                        if not confirmacion[1]:
+                            repetida = await asyncio.to_thread(agenda.resumen_de_reserva, conversacion)
+                            if repetida:
+                                await asyncio.to_thread(canal.enviar, conversacion, [repetida])
+                                return
                         referencia = await asyncio.to_thread(agenda.confirmar, conversacion, confirmacion[1])
                         await asyncio.to_thread(agenda.enviar_pendientes, canal,
                                                config.agenda_plantilla_whatsapp, config.agenda_plantilla_idioma)

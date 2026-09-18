@@ -326,6 +326,38 @@ class Agenda:
             texto += " Recibirás la confirmación y los recordatorios de esta cita por WhatsApp."
         return texto
 
+    def resumen_de_reserva(self, conversacion):
+        """Texto para quien repite AGENDARME sobre una propuesta ya ejecutada.
+
+        Sin esto el servidor reconoce la palabra, no encuentra ningún aviso nuevo
+        que enviar y corta la respuesta: la persona ve al bot mudo justo después
+        de haber reservado, que es cuando más desconfía.
+        """
+        with self.repo.transaccion() as db:
+            contacto = db.obtener("contacto", str(conversacion))
+            if not contacto:
+                return ""
+            control = db.obtener("control", "confirmacion:" + str(conversacion)) or {}
+            propuesta = db.obtener("propuesta", control.get("propuesta_id", ""))
+            if (not propuesta or propuesta["estado"] != "aceptada"
+                    or propuesta["contacto"] != contacto["contacto"]
+                    or propuesta["conversacion"] != str(conversacion)):
+                return ""
+            cita = db.obtener("cita", propuesta.get("cita_id", ""))
+        if not cita or cita.get("pendiente"):
+            # Todavía se resuelve con Google: manda el aviso de espera del webhook.
+            return ""
+        if cita["estado"] == "cancelada":
+            return "Esa cita ya está cancelada. Pedime un horario si querés agendar otra."
+        if cita["estado"] != "confirmada":
+            return ""
+        texto = f"Tu cita ya está agendada: {self.reglas.describir(cita['inicio'], cita['fin'])}."
+        if cita.get("enlace"):
+            texto += "\n" + cita["enlace"]
+        if cita.get("asistencia") == "confirmada":
+            texto += "\nTu asistencia ya está confirmada."
+        return texto
+
     def confirmar(self, conversacion, referencia=""):
         self.sincronizar()
         with self.repo.transaccion() as db:
@@ -412,7 +444,9 @@ class Agenda:
             if descripcion.startswith(anterior):
                 descripcion = descripcion[len(anterior):].lstrip()
                 break
-        return {"summary": resumen,
+        # Colores de Google Calendar: 10 es verde (Basil) y 5 amarillo (Banana).
+        # El color se distingue en la grilla sin abrir el evento ni leer el título.
+        return {"summary": resumen, "colorId": "10" if confirmada else "5",
                 "description": encabezado + ("\n\n" + descripcion if descripcion else "")}
 
     def _actualizar_estado_en_google(self, cita_id, evento=None):

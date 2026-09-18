@@ -153,6 +153,12 @@ pendiente` o `confirmada`, además de la referencia interna. Las notas manuales
 que el equipo agregue después de ese bloque se conservan. Confirmar asistencia
 actualiza el mismo evento, sin crear otro ni cambiar su hora o enlace.
 
+El evento también lleva color, para distinguirlo en la grilla sin abrirlo:
+amarillo (`colorId` 5, Banana) mientras la asistencia está pendiente y verde
+(`colorId` 10, Basil) cuando está confirmada. El color acompaña al título; si
+se cambia a mano en Calendar, la conciliación lo devuelve al que corresponde
+al estado real de la cita.
+
 Reprogramar desde el bot o mover el evento en Google reinicia la asistencia y
 lo devuelve a `⏳ Agendada`. El trabajador concilia títulos y descripciones de
 citas vigentes cada 30 segundos; por eso también migra las videollamadas
