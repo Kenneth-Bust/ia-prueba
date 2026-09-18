@@ -14,6 +14,7 @@ decisiones y pruebas anteriores; no describen por sí solos qué corre hoy.
 | [Piloto actual](piloto-demo.md) | Estado de la demo de uniformes y sus recursos |
 | [Plan de uniformes](demo-uniformes-plan.md) | Requisitos y trabajo pendiente del prospecto de dos números |
 | [Agenda y Google Calendar](agenda.md) | Conexión, operación y configuración de agenda de Smarth House |
+| [Incidente de agenda del 17/09](agenda-incidente-2026-09-17.md) | Hora desactualizada, confirmaciones repetidas, aviso a 30 minutos y correo al dueño |
 | [Revisión de agenda](revision-agenda.md) | Diferencia entre reserva y asistencia, cupos por tratamiento y prueba real pendiente |
 | [Propuesta inicial de agenda](agenda-google-calendar-plan.md) | Requisitos originales del cliente y diseño que dio paso a la implementación |
 

@@ -294,10 +294,10 @@ def test_confirmaciones_y_recordatorios_sobreviven_reinicio_y_no_se_duplican(age
     assert canal.avisos == ["alta"]
     agenda.reloj_prueba[0] = cita(agenda, identificador)["inicio"] - 86400
     otra.enviar_pendientes(canal)
-    agenda.reloj_prueba[0] = cita(agenda, identificador)["inicio"] - 3600
+    agenda.reloj_prueba[0] = cita(agenda, identificador)["inicio"] - 1800
     otra.enviar_pendientes(canal)
     otra.enviar_pendientes(canal)
-    assert canal.avisos == ["alta", "recordatorio-1440", "recordatorio-60"]
+    assert canal.avisos == ["alta", "recordatorio-1440", "recordatorio-30"]
 
 
 def test_envio_incierto_no_se_repite_sin_conciliar(agenda):

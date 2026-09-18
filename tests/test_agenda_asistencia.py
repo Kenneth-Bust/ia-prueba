@@ -21,7 +21,8 @@ def test_agendar_no_confirma_asistencia_y_confirmar_no_reserva_de_nuevo(agenda):
     assert agenda.mis_citas("1")[0]["estado"] == "agendada"
     herramienta = next(h for h in herramientas_agenda(agenda) if h.name == "confirmar_asistencia")
     texto = herramienta.invoke({"referencia": referencia}, config={"configurable": {"thread_id": "1"}})
-    assert "CONFIRMO ASISTENCIA" in texto
+    assert "reserva ya está hecha" in texto
+    assert "CONFIRMO ASISTENCIA" not in texto
     assert actual["asistencia_codigo"] not in texto
     assert cita(agenda, referencia)["asistencia"] == "pendiente"
     for _ in range(2):
@@ -29,7 +30,10 @@ def test_agendar_no_confirma_asistencia_y_confirmar_no_reserva_de_nuevo(agenda):
     otra = Agenda(agenda.reglas, RepositorioAgenda(agenda.repo.destino, agenda.repo.negocio), agenda.google, agenda.reloj)
     assert otra.mis_citas("1")[0]["asistencia"] == "confirmada"
     assert agenda.google.creaciones == 1
-    assert agenda.google.cambios == 0
+    assert agenda.google.cambios == 1
+    evento = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    assert evento["summary"] == "✅ Confirmada — Demo por videollamada — Persona de prueba"
+    assert evento["description"].startswith("Reserva: agendada\nAsistencia: confirmada\n")
 
 
 def test_asistencia_rechaza_otro_contacto_y_codigo_anterior_al_cambio(agenda):
@@ -40,6 +44,9 @@ def test_asistencia_rechaza_otro_contacto_y_codigo_anterior_al_cambio(agenda):
     agenda.confirmar_asistencia("1", codigo)
     cambiar(agenda, referencia)
     assert cita(agenda, referencia)["asistencia"] == "pendiente"
+    evento = agenda.google.eventos[(cita(agenda, referencia)["calendario"], cita(agenda, referencia)["evento_id"])]
+    assert evento["summary"].startswith("⏳ Agendada —")
+    assert "Asistencia: pendiente" in evento["description"]
     with pytest.raises(ErrorDeAgenda):
         agenda.confirmar_asistencia("1", codigo)
     agenda.confirmar_asistencia("1", cita(agenda, referencia)["asistencia_codigo"])
@@ -65,8 +72,61 @@ def test_cambio_manual_reinicia_asistencia_pero_enlace_no(agenda):
     evento["end"]["dateTime"] = "2026-09-22T11:30:00-06:00"
     agenda.sincronizar()
     assert cita(agenda, referencia)["asistencia"] == "pendiente"
+    assert evento["summary"].startswith("⏳ Agendada —")
+    assert "Asistencia: pendiente" in evento["description"]
     with pytest.raises(ErrorDeAgenda):
         agenda.confirmar_asistencia("1", actual["asistencia_codigo"])
+
+
+def test_calendar_distingue_agendada_y_confirmada_sin_perder_notas(agenda):
+    referencia = reservar(agenda)
+    actual = cita(agenda, referencia)
+    evento = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    assert evento["summary"] == "⏳ Agendada — Demo por videollamada — Persona de prueba"
+    assert evento["description"].startswith("Reserva: agendada\nAsistencia: pendiente\n")
+    evento["description"] += "\n\nLlamar por recepción al llegar."
+    agenda.confirmar_asistencia("1")
+    evento = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    assert evento["summary"] == "✅ Confirmada — Demo por videollamada — Persona de prueba"
+    assert "Asistencia: confirmada" in evento["description"]
+    assert evento["description"].endswith("Llamar por recepción al llegar.")
+
+
+def test_falla_al_rotular_calendar_no_pierde_confirmacion_y_se_concilia(agenda):
+    referencia = reservar(agenda)
+    actual = cita(agenda, referencia)
+    agenda.google.falla = "rechazar"
+    assert "Asistencia confirmada" in agenda.confirmar_asistencia("1")
+    assert cita(agenda, referencia)["asistencia"] == "confirmada"
+    evento = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    assert evento["summary"].startswith("⏳ Agendada —")
+    agenda.google.falla = ""
+    agenda.sincronizar()
+    assert evento["summary"].startswith("✅ Confirmada —")
+
+
+def test_sincronizacion_migra_videollamada_anterior_y_conserva_notas(agenda):
+    referencia = reservar(agenda)
+    actual = cita(agenda, referencia)
+    evento = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    evento["summary"] = "Demo por videollamada — Persona de prueba"
+    evento["description"] = (f"Referencia: {referencia}\nGestionada por el asistente de Smarth House."
+                             "\n\nNota anterior del equipo.")
+    agenda.sincronizar()
+    assert evento["summary"] == "⏳ Agendada — Demo por videollamada — Persona de prueba"
+    assert evento["description"].startswith("Reserva: agendada\nAsistencia: pendiente\n")
+    assert evento["description"].endswith("Nota anterior del equipo.")
+
+
+def test_estado_visible_ya_correcto_actualiza_etag_para_reprogramar(agenda):
+    referencia = reservar(agenda)
+    actual = cita(agenda, referencia)
+    evento = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    evento["etag"] = '"edicion-manual"'
+    agenda.sincronizar()
+    assert cita(agenda, referencia)["etag"] == '"edicion-manual"'
+    cambiar(agenda, referencia)
+    assert cita(agenda, referencia)["inicio"] != actual["inicio"]
 
 
 def test_asistencia_cancelada_o_pasada_no_se_confirma(agenda):
@@ -99,6 +159,8 @@ def test_cita_heredada_no_asume_asistencia(agenda):
             antigua.pop(campo)
         db.guardar("cita", antigua)
     assert agenda.mis_citas("1")[0]["asistencia"] == "pendiente"
+    assert "reserva ya está hecha" in agenda.solicitar_asistencia("1", referencia)
+    agenda.reloj_prueba[0] = antigua["inicio"] - 1800
     assert "CONFIRMO ASISTENCIA" in agenda.solicitar_asistencia("1", referencia)
     assert agenda.google.creaciones == 1
 

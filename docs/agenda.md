@@ -9,6 +9,13 @@ sencilla habilitadas y atiende WhatsApp real.
 El registro del despliegue, con identificadores y huellas, está en
 [operacion.md](operacion.md#registro-de-despliegues-verificados).
 
+**Corrección local del 17/09/2026, pendiente de despliegue:**
+`correccion/agenda-confirmaciones-hora` corrige el incidente observado en la
+conversación 57. La política de 30 minutos descrita más abajo corresponde a
+esta corrección; no asumir que producción la tiene hasta verificar el despliegue.
+Detalle de causas, pruebas y aviso al dueño en
+[agenda-incidente-2026-09-17.md](agenda-incidente-2026-09-17.md).
+
 La prueba funcional real creó la cita, el enlace de Meet y confirmó asistencia
 con las respuestas `CONFIRMAR` y `CONFIRMO ASISTENCIA`. Falta comprobar la
 entrega del recordatorio a su hora. No crear cuentas ni recursos para la clínica
@@ -64,7 +71,8 @@ La configuración aprobada de Smarth House es:
 
 - Lunes a sábado, de 08:00 a 17:30, zona `America/Managua`.
 - Demo por videollamada de 30 minutos, una a la vez.
-- Confirmación inmediata y recordatorios 24 horas y una hora antes.
+- Confirmación inmediata de la reserva y recordatorios 24 horas y 30 minutos
+  antes. Solo el de 30 minutos pide asistencia, si todavía no está confirmada.
 - Agenda editable también desde Google Calendar por el equipo.
 
 Supuestos iniciales editables: anticipación mínima de una hora, agenda abierta
@@ -130,6 +138,32 @@ datos de pacientes esa decisión debe revisarse.
 No se añadieron dependencias Python: utiliza la biblioteca estándar, LangChain
 y el conector/pool de PostgreSQL disponibles en el proyecto.
 
+### Estado visible en Google Calendar
+
+Las videollamadas administradas por el bot muestran la diferencia entre una
+reserva y la confirmación de asistencia:
+
+- `⏳ Agendada — Demo por videollamada — Nombre`: la cita existe, ocupa el
+  horario y la asistencia todavía está pendiente.
+- `✅ Confirmada — Demo por videollamada — Nombre`: la persona respondió
+  `CONFIRMO ASISTENCIA`.
+
+La descripción muestra por separado `Reserva: agendada` y `Asistencia:
+pendiente` o `confirmada`, además de la referencia interna. Las notas manuales
+que el equipo agregue después de ese bloque se conservan. Confirmar asistencia
+actualiza el mismo evento, sin crear otro ni cambiar su hora o enlace.
+
+Reprogramar desde el bot o mover el evento en Google reinicia la asistencia y
+lo devuelve a `⏳ Agendada`. El trabajador concilia títulos y descripciones de
+citas vigentes cada 30 segundos; por eso también migra las videollamadas
+futuras creadas antes de esta mejora. Si Google falla después de registrar la
+respuesta, la confirmación queda guardada y el trabajador vuelve a reflejarla
+sin pedírsela otra vez a la persona.
+
+`Confirmada` significa confirmación de asistencia, no que la cita ya fue
+atendida. Un estado clínico posterior, como atendida o ausente, sigue fuera de
+esta etapa.
+
 La agenda se activa únicamente con `AGENDA_REGLAS_RUTA` y una configuración
 completa. Portal y agenda pueden coexistir. Sin esa variable, los bots
 conservan las herramientas existentes y la demo se deriva al equipo.
@@ -150,6 +184,18 @@ La confirmación sigue siendo explícita aunque la solicitud inicial llegue por
 audio. También acepta `CONFIRMO` y `SÍ, CONFIRMO`; un «sí» suelto no crea ni
 cancela citas. Repetir la confirmación no duplica el evento. Las referencias
 técnicas quedan en PostgreSQL y en la descripción privada de Google.
+
+La corrección del 17/09 también admite negrita y cursiva alrededor del comando,
+por ejemplo `*CONFIRMAR*` o `_Confirmar_`. No interpreta una negación, una
+pregunta, texto tachado ni una corrección de horario como autorización.
+La reserva no pide una segunda confirmación de asistencia de inmediato.
+El último recordatorio la solicita; si ya se confirmó, no vuelve a pedirla.
+
+Cada llamada al modelo recibe hora actual en la zona del negocio y estado
+persistido de propuestas y citas del contacto. Ese contexto no se guarda en
+la memoria ni en el bloque de caché: evita repetir la hora de una consulta
+vieja o tratar como pendiente una reserva completada por el webhook. La
+disponibilidad y los cambios manuales se verifican con las herramientas.
 
 Los IDs de contacto provienen del webhook autenticado; no son argumentos que
 pueda inventar el modelo. Una conversación nueva del mismo contacto puede
@@ -274,11 +320,23 @@ La propuesta informa que se enviarán recordatorios. La persona puede escribir
 `SIN RECORDATORIOS` para desactivarlos o `ACTIVAR RECORDATORIOS` para reactivarlos.
 Cancelar recordatorios conserva las citas y sus confirmaciones operativas.
 
-Smarth House programa WhatsApp 24 horas y una hora antes. El aviso de 30 minutos
+Smarth House programa WhatsApp 24 horas y 30 minutos antes. El aviso de 30 minutos
 que muestra Google Calendar es la notificación predeterminada del calendario al
 dueño de la cuenta; no es un mensaje de WhatsApp para el contacto. Si una cita
 se crea después de la hora prevista para uno de sus avisos, ese aviso pasado no
 se programa.
+
+El trabajador adapta los avisos pendientes de citas existentes cuando cambia
+la lista de minutos: anula los de una hora y agrega el de 30 minutos si su hora
+todavía no pasó. Conserva los registros aceptados o inciertos para no reenviar.
+La actualización no recrea eventos ni vuelve a enviar la confirmación inicial.
+
+**Avisos al dueño:** el bot no envía un correo propio al crear una reserva.
+La consulta real del 17/09 encontró `popup` a 30 minutos en los recordatorios
+predeterminados de `primary`. Las notificaciones de creación se configuran
+aparte en Google Calendar; no se pudo leer ni modificar esa preferencia con
+el permiso actual (`CalendarList` respondió 403). Ver los pasos y el límite de
+verificación en el [incidente del 17/09](agenda-incidente-2026-09-17.md#aviso-al-dueño).
 
 Referencias: [API de mensajes y plantillas de Chatwoot](https://developers.chatwoot.com/api-reference/messages/create-new-message),
 [ventana por canal](https://developers.chatwoot.com/self-hosted/supported-features).

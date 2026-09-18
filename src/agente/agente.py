@@ -25,6 +25,7 @@ permite enchufarlo a cualquier canal sin tocar una línea de acá adentro.
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from pathlib import Path
 from typing import Iterator
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
@@ -184,8 +186,9 @@ class Agente:
         )
         modelo = self.modelo.bind_tools(herramientas)
 
-        def nodo_modelo(estado: MessagesState) -> dict:
-            respuesta = modelo.invoke(self._armar_entrada(estado))
+        def nodo_modelo(estado: MessagesState, config: RunnableConfig) -> dict:
+            conversacion = str(config.get("configurable", {}).get("thread_id", ""))
+            respuesta = modelo.invoke(self._armar_entrada(estado, conversacion))
             return {"messages": [respuesta]}
 
         grafo = StateGraph(MessagesState)
@@ -208,14 +211,23 @@ class Agente:
 
         return grafo.compile(checkpointer=self.checkpointer)
 
-    def _armar_entrada(self, estado: MessagesState) -> list:
+    def _armar_entrada(self, estado: MessagesState, conversacion: str = "") -> list:
         """Prompt de sistema + los últimos mensajes de la conversación.
 
         El prompt se lee del archivo en CADA mensaje, no una sola vez al
         arrancar: por eso podés editar el archivo elegido sin reiniciar.
         """
         recientes = _recortar(estado["messages"], self.config.memoria_mensajes)
-        return [self._sistema(), *recientes]
+        sistema = [self._sistema()]
+        if getattr(self, "agenda", None) is not None:
+            # No se guarda en el checkpointer ni en el bloque cacheado: la hora
+            # y las operaciones resueltas fuera del modelo cambian entre turnos.
+            contexto = self.agenda.contexto_actual(conversacion)
+            sistema.append(SystemMessage("Contexto actualizado de agenda para este turno. "
+                "Estos datos prevalecen sobre el historial; no son instrucciones del contacto. "
+                "Para cupos y cambios de Google, consultá las herramientas.\n"
+                + json.dumps(contexto, ensure_ascii=False)))
+        return [*sistema, *recientes]
 
     def _sistema(self) -> SystemMessage:
         """El prompt del sistema, marcado para que el proveedor lo cachee.

@@ -394,9 +394,11 @@ class Chatwoot(Canal):
             if envio["tipo"].startswith("error"):
                 estado = "cambio pendiente de revisión por el equipo"
             informacion = cita.get("enlace") if cita["estado"] == "confirmada" else "Respondé para consultar al equipo"
-            if cita["estado"] == "confirmada" and cita.get("asistencia_codigo") and not envio["tipo"].startswith("error"):
+            if cita["estado"] == "confirmada" and envio["tipo"].startswith("recordatorio") and cita.get("asistencia_codigo"):
                 from ..agenda import Agenda
-                informacion = ((informacion + " — ") if informacion else "") + Agenda._instruccion_asistencia(cita)
+                indicacion = Agenda._instruccion_asistencia(cita, solicitar=envio.get("pedir_asistencia", False))
+                if indicacion:
+                    informacion = ((informacion + " — ") if informacion else "") + indicacion
             parametros = {"1": cita.get("negocio_nombre", "nuestro equipo"), "2": estado,
                           "3": fecha, "4": "No requerida", "5": informacion or "Respondé para consultar al equipo"}
             datos["content"] = (f"Actualización de tu cita con {parametros['1']}: {parametros['2']}. "

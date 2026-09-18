@@ -8,6 +8,7 @@ from test_agenda import agenda, propuesta, cita, reservar
 from test_chatwoot import ChatwootFalso, cliente, evento
 from test_agente import agente_falso
 from agente.agenda_modelo import ErrorDeAgenda
+from agente.config import RAIZ
 
 
 class CanalAgenda(ChatwootFalso):
@@ -65,13 +66,15 @@ def test_recupera_post_por_marca_sin_enviar_otra_vez():
     assert len(canal.envios()) == 1
 
 
-def test_webhook_confirma_sin_usar_ia(agenda):
+@pytest.mark.parametrize("texto", ["Confirmar", "*CONFIRMAR*", "_Confirmar_", "**confirmar**",
+                                  "`CONFIRMAR`", "“CONFIRMAR”", "  Sí, confirmo!  "])
+def test_webhook_confirma_sin_usar_ia(agenda, texto):
     referencia = propuesta(agenda)
     agente = agente_falso([])
     agente.agenda = agenda
     agente.config.chatwoot_bandeja_id = "1"
     canal = CanalAgenda()
-    entrada = evento("Confirmar", conversacion=1)
+    entrada = evento(texto, conversacion=1)
     entrada.update(sender={"id": 1, "type": "contact"}, inbox={"id": 1})
     with cliente(canal, agente) as web:
         resultado = web.post("/chatwoot/secreto", json=entrada)
@@ -81,6 +84,7 @@ def test_webhook_confirma_sin_usar_ia(agenda):
     assert "Cita agendada" in canal.envios()[0]
     assert referencia not in canal.envios()[0]
     assert "Referencia:" not in canal.envios()[0]
+    assert "CONFIRMO ASISTENCIA" not in canal.envios()[0]
 
 
 def test_webhook_otro_contacto_no_puede_confirmar_propuesta(agenda):
@@ -109,18 +113,38 @@ def test_webhook_confirma_asistencia_sin_llamar_al_modelo(agenda):
     assert cita(agenda, referencia)["asistencia"] == "confirmada"
     assert agenda.google.creaciones == 1
     assert any("Asistencia confirmada" in texto for texto in canal.envios())
+    actual = cita(agenda, referencia)
+    evento_google = agenda.google.eventos[(actual["calendario"], actual["evento_id"])]
+    assert evento_google["summary"].startswith("✅ Confirmada —")
 
 
-def test_plantilla_distingue_reserva_y_asistencia():
+def test_salud_publica_estado_visible_y_recordatorios(agenda):
+    agente = agente_falso([])
+    agente.agenda = agenda
+    agente.config.chatwoot_bandeja_id = "1"
+    agente.config.agenda_reglas_ruta = RAIZ / "agendas/smarth_house.json"
+    with cliente(CanalAgenda(), agente) as web:
+        salud = web.get("/salud").json()
+    assert salud["agenda_estado_calendario"] == "visible"
+    assert salud["agenda_recordatorios_minutos"] == [1440, 30]
+
+
+def test_plantilla_pide_asistencia_solo_en_el_recordatorio_cercano():
     canal = CanalAgenda(False)
     envio, contacto, cita = aviso()
     cita.update(asistencia="pendiente", asistencia_codigo="abcdef123456")
     canal.enviar_aviso_agenda(envio, contacto, cita, "actualizacion_cita", "es")
     parametros = canal.mensajes[-1]["template_params"]["processed_params"]["body"]
     assert parametros["2"] == "agendada"
-    assert "CONFIRMO ASISTENCIA" in parametros["5"]
+    assert "CONFIRMO ASISTENCIA" not in parametros["5"]
     assert "abcdef123456" not in parametros["5"]
     assert parametros["4"] == "No requerida"
+    envio.update(tipo="recordatorio-1440", pedir_asistencia=False)
+    canal.enviar_aviso_agenda(envio, contacto, cita, "actualizacion_cita", "es")
+    assert "CONFIRMO ASISTENCIA" not in canal.mensajes[-1]["content"]
+    envio.update(tipo="recordatorio-30", pedir_asistencia=True)
+    canal.enviar_aviso_agenda(envio, contacto, cita, "actualizacion_cita", "es")
+    assert "CONFIRMO ASISTENCIA" in canal.mensajes[-1]["content"]
     cita["asistencia"] = "confirmada"
     canal.enviar_aviso_agenda(envio, contacto, cita, "actualizacion_cita", "es")
     assert "Tu asistencia ya está confirmada" in canal.mensajes[-1]["content"]
