@@ -66,7 +66,8 @@ def test_recupera_post_por_marca_sin_enviar_otra_vez():
     assert len(canal.envios()) == 1
 
 
-@pytest.mark.parametrize("texto", ["Confirmar", "*CONFIRMAR*", "_Confirmar_", "**confirmar**",
+@pytest.mark.parametrize("texto", ["AGENDARME", "*Agendarme*", "agéndame", "  Sí, agendarme!  ",
+                                  "Confirmar", "*CONFIRMAR*", "_Confirmar_", "**confirmar**",
                                   "`CONFIRMAR`", "“CONFIRMAR”", "  Sí, confirmo!  "])
 def test_webhook_confirma_sin_usar_ia(agenda, texto):
     referencia = propuesta(agenda)

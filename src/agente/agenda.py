@@ -20,8 +20,13 @@ from .calendario_google import CalendarioGoogle, ErrorGoogle, fecha_google
 
 registro = logging.getLogger("agente.agenda")
 ACTIVAS = ("confirmada", "pendiente")
+# AGENDARME es la palabra que ve la persona; CONFIRMAR se sigue aceptando porque
+# las conversaciones abiertas conservan la instrucción anterior en pantalla y
+# quien la lea ahí no debe quedar trabado. 'agendar' suelto queda afuera a
+# propósito: es una intención ("quiero agendar"), no una autorización.
 CONFIRMACION = re.compile(
-    r"(?:s[ií][, ]+)?(?:quiero\s+)?confirm(?:ar|o)(?:\s+([a-f0-9]{12}))?[.!]?",
+    r"(?:s[ií][, ]+)?(?:quiero\s+)?(?:ag[eé]nd(?:arme|ame)|confirm(?:ar|o))"
+    r"(?:\s+([a-f0-9]{12}))?[.!]?",
     re.IGNORECASE,
 )
 ASISTENCIA = re.compile(
@@ -33,7 +38,8 @@ REGLA_AGENDA = """Tenés herramientas de agenda reales. Consultá disponibilidad
 actual con consultar_disponibilidad; el catálogo no determina cupos. Para una demo
 ofrecé los horarios de agenda y usá agendar_cita con nombre y horario elegidos.
 Agendar, cancelar y reprogramar preparan una propuesta: todavía NO ejecutan el
-cambio. Copiá completa su respuesta: la persona solo debe responder CONFIRMAR.
+cambio. Copiá completa su respuesta: la persona solo debe responder AGENDARME
+(CONFIRMAR cuando la propuesta es una cancelación).
 El servidor vincula esa palabra a la última propuesta de la conversación. No llames una
 propuesta 'cita confirmada'. No inventes horarios, enlaces ni resultados.
 Para modificar una cita, consultá consultar_mis_citas y preguntá cuál si hay varias.
@@ -45,7 +51,7 @@ Las referencias que devuelven las herramientas son internas: nunca las
 muestres ni le pidas a la persona que las copie.
 La hora actual y el estado persistido llegan en el contexto actualizado de cada
 turno: prevalecen sobre horas, propuestas y respuestas viejas del historial.
-Una propuesta aceptada no está pendiente de CONFIRMAR. Si la cita ya pasó,
+Una propuesta aceptada no está pendiente de AGENDARME. Si la cita ya pasó,
 reconocelo y consultá disponibilidad nueva; nunca insistas con el horario pasado.
 Al ofrecer horas, aclará la zona del negocio. No deduzcas el país del contacto
 por su teléfono ni inventes diferencias horarias. Si menciona otra zona, pedí
@@ -307,9 +313,14 @@ class Agenda:
             db.guardar("control", {"id": "confirmacion:" + str(conversacion),
                                    "propuesta_id": propuesta["id"], "contacto": contacto["contacto"]})
         verbo = {"alta": "Reservar", "mover": "Reprogramar", "cancelar": "Cancelar"}[accion]
+        # Para una cancelación, AGENDARME diría lo contrario de lo que la persona
+        # está autorizando, así que esa propuesta conserva CONFIRMAR.
+        indicacion = {"alta": "Para agendarla, respondé AGENDARME.",
+                      "mover": "Para reprogramarla, respondé AGENDARME.",
+                      "cancelar": "Para cancelarla, respondé CONFIRMAR."}[accion]
         texto = (f"{verbo}: {self.reglas.servicios[servicio]['nombre']}, "
                  f"{self.reglas.describir(inicio, fin)}, {self.reglas.recursos[recurso]['nombre']}. "
-                 f"A nombre de {nombre}.\nPara confirmar, respondé CONFIRMAR. "
+                 f"A nombre de {nombre}.\n{indicacion} "
                  "La propuesta vence en 15 minutos; el cupo se verifica al confirmar.")
         if accion != "cancelar":
             texto += " Recibirás la confirmación y los recordatorios de esta cita por WhatsApp."

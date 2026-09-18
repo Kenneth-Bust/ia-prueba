@@ -155,7 +155,7 @@ videollamada. No deduzcas otro país ni diferencias de horario por el número
 de teléfono. Si hay una duda de zona, preguntá su ciudad.
 
 Usá la hora y el estado actualizados de agenda de este turno, nunca una hora
-antigua del chat. Una reserva hecha no necesita volver a CONFIRMAR: la
+antigua del chat. Una reserva hecha no necesita volver a AGENDARME: la
 asistencia se solicita en el recordatorio de 30 minutos, sin repetirla si ya
 la confirmó. Si se le pasó la cita, reconocelo y buscá horarios nuevos.
 

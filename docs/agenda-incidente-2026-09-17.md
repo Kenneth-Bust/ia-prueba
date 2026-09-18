@@ -44,6 +44,20 @@ periódica actualiza también eventos futuros anteriores y reintenta una etiquet
 que Google no haya aceptado, sin duplicar la cita. Las notas manuales de la
 descripción se conservan.
 
+## Cambio de palabra: AGENDARME
+
+El usuario pidió que la reserva se autorice con `AGENDARME` en lugar de
+`CONFIRMAR`; la asistencia sigue con `CONFIRMO ASISTENCIA`. La propuesta de alta
+dice «Para agendarla, respondé AGENDARME» y la de reprogramación «Para
+reprogramarla, respondé AGENDARME». Una cancelación conserva `CONFIRMAR`: pedir
+«AGENDARME» para cancelar invierte el sentido de lo que la persona autoriza.
+
+El servidor sigue aceptando `CONFIRMAR` y `CONFIRMO` sin anunciarlos, porque las
+conversaciones abiertas —la del incidente, entre ellas— conservan la instrucción
+anterior en pantalla. Se aceptan además `AGÉNDAME` y `AGENDAME`, con o sin
+negrita o cursiva. Queda afuera `agendar` sin pronombre: «quiero agendar» es una
+intención y no debe ejecutar una propuesta viva.
+
 ## Aviso al dueño
 
 El usuario eligió recibirlo por Google Calendar/correo. El código no tiene un

@@ -85,8 +85,8 @@ def agenda(tmp_path, request):
 
 def propuesta(agenda, conversacion="1", fecha="2026-09-22T09:00", recurso="asesor"):
     texto = agenda.proponer(conversacion, "alta", servicio="demo", recurso=recurso, fecha=fecha, nombre="Persona de prueba")
-    assert "respondé CONFIRMAR" in texto
-    assert not re.search(r"CONFIRMAR\s+[a-f0-9]", texto)
+    assert "respondé AGENDARME" in texto
+    assert not re.search(r"AGENDARME\s+[a-f0-9]", texto)
     return propuesta_actual(agenda, conversacion)
 
 
@@ -355,7 +355,7 @@ def test_propuesta_de_agenda_no_se_convierte_en_confirmacion_por_el_modelo(agend
         AIMessage("Ya está confirmada la cita: afirmación falsa del modelo")]))
     agente.grafo = agente._construir_grafo()
     respuesta = agente.responder("Quiero reservar a las nueve", "1")
-    assert "respondé CONFIRMAR" in respuesta.texto
-    assert not re.search(r"CONFIRMAR\s+[a-f0-9]", respuesta.texto)
+    assert "respondé AGENDARME" in respuesta.texto
+    assert not re.search(r"AGENDARME\s+[a-f0-9]", respuesta.texto)
     assert "afirmación falsa" not in respuesta.texto
     assert agenda.google.creaciones == 0

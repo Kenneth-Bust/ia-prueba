@@ -16,9 +16,18 @@ from agente.agenda import Agenda, CONFIRMACION, ASISTENCIA, normalizar_comando_a
 
 @pytest.mark.parametrize("texto", ["no confirmar", "no confirmo", "¿confirmar?", "confirmar mañana",
                                   "confirmar pero a las cuatro", "sí", "hoy está bien",
-                                  "*no confirmar*", "~CONFIRMAR~", "CONFIRMAR\nmejor a las cuatro"])
+                                  "*no confirmar*", "~CONFIRMAR~", "CONFIRMAR\nmejor a las cuatro",
+                                  "agendar", "quiero agendar", "me agendás?", "¿agendarme?",
+                                  "no agendarme", "agendarme mañana", "agenda"])
 def test_normalizar_no_convierte_una_duda_o_cambio_en_autorizacion(texto):
     assert not CONFIRMACION.fullmatch(normalizar_comando_agenda(texto))
+
+
+@pytest.mark.parametrize("texto", ["AGENDARME", "agendarme", "*Agendarme*", "_AGENDARME_",
+                                   "agéndame", "agendame", "sí, agendarme", "quiero agendarme",
+                                   "CONFIRMAR", "Sí, confirmo"])
+def test_agendarme_autoriza_y_confirmar_sigue_valiendo_para_chats_abiertos(texto):
+    assert CONFIRMACION.fullmatch(normalizar_comando_agenda(texto))
 
 
 @pytest.mark.parametrize("texto", ["_Confirmo asistencia_", "**CONFIRMO ASISTENCIA**", "sí, confirmo mi asistencia"])

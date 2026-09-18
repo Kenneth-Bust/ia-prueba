@@ -102,12 +102,12 @@ o se puede ejecutar `sincronizar` antes de consultar una base local.
 
 1. Desde tu WhatsApp de prueba escribí: “Quiero agendar una videollamada para
    mañana”. Elegí un horario disponible y proporcioná tu nombre.
-2. Respondé `CONFIRMAR`, sin copiar códigos. Antes de ese mensaje solo hay una
+2. Respondé `AGENDARME`, sin copiar códigos. Antes de ese mensaje solo hay una
    propuesta; aún no existe la reserva.
 3. Comprobá el evento en el calendario de la agencia y el enlace de Google Meet.
 4. Mandá `CONFIRMO ASISTENCIA` y luego “¿Cómo está mi cita?”. Debe
    mostrar reserva agendada y asistencia confirmada.
-5. Pedí reprogramarla, respondé otra vez `CONFIRMAR` y comprobá que el mismo evento
+5. Pedí reprogramarla, respondé otra vez `AGENDARME` y comprobá que el mismo evento
    cambie de horario; la asistencia debe volver a pendiente.
 6. Pedí cancelarla y confirmá. Debe desaparecer del calendario activo y no
    mantener recordatorios pendientes de esa reserva.
@@ -138,8 +138,8 @@ No equivale a una clínica ya conectada ni a una entrega operativa completa.
 ## Confirmación sencilla para WhatsApp
 
 El usuario no copia identificadores. Después del resumen de una alta,
-reprogramación o cancelación responde `CONFIRMAR`. También se aceptan
-`CONFIRMO` y `SÍ, CONFIRMO`. El servidor recupera la última propuesta asociada
+reprogramación responde `AGENDARME`, y `CONFIRMAR` ante una cancelación.
+También se aceptan `AGÉNDAME`, `SÍ, AGENDARME`, `CONFIRMO` y `SÍ, CONFIRMO`. El servidor recupera la última propuesta asociada
 a esa conversación y al contacto verificado, comprueba que no venció y vuelve
 a validar el cupo antes de escribir en Google. Repetir la respuesta no duplica
 el evento. Una conversación distinta no puede confirmar esa propuesta.

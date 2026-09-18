@@ -171,7 +171,8 @@ conservan las herramientas existentes y la demo se deriva al equipo.
 ### Confirmación antes de modificar
 
 Las herramientas preparan una propuesta con fecha, horario, recurso y nombre.
-La persona responde `CONFIRMAR` para ejecutarla, sin copiar identificadores. El
+La persona responde `AGENDARME` para ejecutarla, sin copiar identificadores; una
+propuesta de cancelación pide `CONFIRMAR`, porque ahí agendar diría lo contrario. El
 servidor recupera la última propuesta de esa conversación. La propuesta
 vence en 15 minutos y no retiene cupos. Al confirmar se valida nuevamente la
 capacidad, dentro de una transacción compartida por todas las conversaciones.
@@ -181,12 +182,14 @@ procesa el texto explícito y comprueba que la propuesta pertenezca al contacto
 y a la conversación. La respuesta visible de una propuesta sale del resultado
 validado de la herramienta, aunque el modelo redacte después otra cosa.
 La confirmación sigue siendo explícita aunque la solicitud inicial llegue por
-audio. También acepta `CONFIRMO` y `SÍ, CONFIRMO`; un «sí» suelto no crea ni
+audio. También acepta `AGÉNDAME`, `SÍ, AGENDARME`, y —por las conversaciones
+abiertas con la instrucción anterior— `CONFIRMAR`, `CONFIRMO` y `SÍ, CONFIRMO`.
+Un «sí» suelto o un `agendar` sin pronombre no crean ni
 cancela citas. Repetir la confirmación no duplica el evento. Las referencias
 técnicas quedan en PostgreSQL y en la descripción privada de Google.
 
 La corrección del 17/09 también admite negrita y cursiva alrededor del comando,
-por ejemplo `*CONFIRMAR*` o `_Confirmar_`. No interpreta una negación, una
+por ejemplo `*AGENDARME*` o `_Agendarme_`. No interpreta una negación, una
 pregunta, texto tachado ni una corrección de horario como autorización.
 La reserva no pide una segunda confirmación de asistencia de inmediato.
 El último recordatorio la solicita; si ya se confirmó, no vuelve a pedirla.
