@@ -325,6 +325,17 @@ en el `.env` no implica que Meta la haya aprobado.
 
 Configurar `AGENDA_PLANTILLA_WHATSAPP` y `AGENDA_PLANTILLA_IDIOMA` al verificarla.
 Sin plantilla, los avisos fuera de ventana quedan bloqueados en la cola.
+
+**Estado verificado el 17/09/2026: no hay plantilla de agenda.** La bandeja de
+Smarth House tiene sincronizadas `seguimiento_automatizacion_v1` (MARKETING, es)
+y `hello_world` (UTILITY, `en_US`); ninguna sirve para estos avisos, y una
+búsqueda en Chatwoot no encontró ningún mensaje enviado con el cuerpo de
+plantilla. Consecuencia concreta: quien reserve con más de un día de
+anticipación y no vuelva a escribir **no recibe el recordatorio**. Con demos
+para el mismo día o el siguiente no se nota, porque la conversación sigue
+abierta y el aviso sale como mensaje normal. No usar la plantilla de MARKETING
+para estos avisos: el código envía la categoría `UTILITY` y Meta trata los
+mensajes de marketing con otras reglas y otro costo.
 La propuesta informa que se enviarán recordatorios. La persona puede escribir
 `SIN RECORDATORIOS` para desactivarlos o `ACTIVAR RECORDATORIOS` para reactivarlos.
 Cancelar recordatorios conserva las citas y sus confirmaciones operativas.

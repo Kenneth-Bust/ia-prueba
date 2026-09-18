@@ -92,14 +92,27 @@ el 15/09/2026 en `funcionalidad/agenda-google-calendar`: el bot consulta cupos,
 reserva, cancela y reprograma citas reales en Google Calendar, con enlace de
 Meet. Smarth House la usa para sus demos por videollamada.
 
-- **Desplegada en producción el 15/09/2026** como `be1df75`. `/salud` responde
-  `agenda: habilitada`. Verificada contra Google real, no simulada: alta,
-  cambio, cancelación, detección de bajas hechas a mano en el calendario y una
-  conversación completa con el modelo. **Falta la prueba con un contacto real
-  por WhatsApp.**
+- **Desplegada en producción**, última vez el 17/09/2026 como `f4b9b52`.
+  `/salud` responde `agenda: habilitada` y `agenda_estado_calendario: visible`.
+  Verificada contra Google real, no simulada: alta, cambio, cancelación,
+  detección de bajas hechas a mano en el calendario y una conversación completa
+  con el modelo. **La prueba por WhatsApp con un contacto real ya se hizo** el
+  17/09 por la noche; el recorrido está en
+  [docs/agenda-incidente-2026-09-17.md](docs/agenda-incidente-2026-09-17.md).
 - **La confirmación no la ejecuta el modelo.** Las herramientas devuelven una
-  propuesta con su referencia; el webhook procesa el `CONFIRMAR` explícito.
+  propuesta con su referencia; el webhook procesa la palabra explícita:
+  **`AGENDARME`** para reservar o reprogramar y `CONFIRMAR` para cancelar. El
+  servidor sigue aceptando `CONFIRMAR` sin anunciarlo, porque las
+  conversaciones abiertas conservan la instrucción anterior en pantalla.
   No tratar una propuesta como cita reservada.
+- **Reserva y asistencia son estados distintos y se ven en Calendar.**
+  `⏳ Agendada` en amarillo mientras la asistencia está pendiente y
+  `✅ Confirmada` en verde tras `CONFIRMO ASISTENCIA`, que se pide una sola
+  vez, en el recordatorio de 30 minutos. Reprogramar reinicia la asistencia.
+- **Falta la plantilla UTILITY de WhatsApp.** Sin ella, los avisos fuera de la
+  ventana de 24 h quedan `bloqueado` y **no llegan**: afecta a quien reserva
+  con más de un día de anticipación y no vuelve a escribir. Las demos del
+  mismo día o del día siguiente no lo notan.
 - **Se activa solo con `AGENDA_REGLAS_RUTA`.** Sin esa variable la agenda
   queda apagada y los bots se comportan como antes. Las siete variables de
   agenda se cargan juntas: a medias, el contenedor no arranca.

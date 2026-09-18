@@ -78,6 +78,41 @@ Pedido del usuario para leer la grilla sin abrir cada cita: amarillo
 (`colorId` 5) mientras la asistencia está pendiente, verde (`colorId` 10)
 cuando está confirmada. Reprogramar lo devuelve a amarillo junto con el título.
 
+## Prueba real por WhatsApp, 17/09 por la noche
+
+La hizo el usuario desde su propio número, a nombre de «Joel», y pasó completa:
+reserva con `AGENDARME`, repetición de la palabra —que ahora contesta en vez de
+dejar mudo al bot—, reprogramación, y dos borrados manuales del evento en
+Calendar que el sistema detectó y avisó como `Cita cancelada` en menos de un
+minuto. Tras cancelar, el cupo volvió a ofrecerse. Lectura directa de Google el
+17/09: la cita vigente del 18/09 aparece con `colorId` 10, o sea que la
+conciliación coloreó una cita creada antes de la mejora.
+
+Queda una mejora sugerida y no implementada: el aviso de baja externa dice solo
+`Cita cancelada: <horario>`, sin explicar ni ofrecer otro horario. A un contacto
+que no pidió cancelar le llega seco.
+
+## Hallazgos operativos de esa sesión
+
+- **No hay plantilla UTILITY aprobada.** La bandeja de Smarth House tiene
+  sincronizadas `seguimiento_automatizacion_v1` (MARKETING) y `hello_world`
+  (UTILITY en inglés); ninguna sirve. Nunca se envió un aviso por plantilla.
+  Consecuencia: fuera de la ventana de 24 h los avisos quedan `bloqueado` y no
+  llegan. Hoy no se nota porque las demos se agendan para el mismo día o el
+  siguiente y la conversación sigue abierta.
+- **`scripts/agenda_admin.py` no audita producción desde la máquina local.**
+  `.env.agenda.local` apunta a `datos/agenda-pruebas.db` con `MODO=test`: sus
+  conteos son de una base de pruebas. Para ver el estado real hay que leer
+  Google directamente o la base del servidor. Confundir ambas lleva a creer que
+  no hay citas cuando sí las hay.
+- **El correo de «Eventos nuevos» de Google no es configurable en este caso.**
+  En la pantalla del calendario aparece en gris, con «Automático»: Google solo
+  avisa cuando **otra** persona agrega un evento, y el bot escribe con la cuenta
+  dueña del calendario. Lo mismo vale para eventos modificados y cancelados.
+  Alternativas sin código: «Agenda diaria» por correo y una notificación de
+  evento por correo. La solución real al pedido original —enterarse al momento
+  de la reserva— es un aviso propio del bot, todavía no implementado.
+
 ## Aviso al dueño
 
 El usuario eligió recibirlo por Google Calendar/correo. El código no tiene un

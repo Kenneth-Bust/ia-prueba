@@ -334,6 +334,34 @@ dentro del plazo ni reutilizar el precio del historial como oferta vigente.
 
 ## Registro de despliegues verificados
 
+### 17/09/2026 — AGENDARME, color en Calendar y respuesta al repetir
+
+Dos despliegues de `agente-ia` desde `main`, ambos con `scripts/desplegar.py`:
+commit `8d45fa5069a041992746904b42386c124ee3914e` (solicitud
+`alal4xl0t1lmfnrnpn5hzkdm`) y commit `f4b9b5249640f0b812efe02ee2287e1d1ae8dab5`
+(`msl8sguknzn5oywsn853qjka`). Los dos quedaron `finished` y verificados: commit
+esperado, servicio sano y prompt correcto. `/salud` confirmó `estado: ok`,
+`agenda: habilitada`, `agenda_estado_calendario: visible` y
+`agenda_recordatorios_minutos: [1440, 30]`.
+
+Qué cambió para el contacto: reservar y reprogramar se autorizan con
+**`AGENDARME`**; cancelar conserva `CONFIRMAR`. El servidor sigue aceptando
+`CONFIRMAR` y `CONFIRMO` sin anunciarlos, porque las conversaciones abiertas
+conservan la instrucción anterior en pantalla. El evento de Calendar lleva
+color además del título: amarillo con la asistencia pendiente, verde cuando
+está confirmada. Repetir `AGENDARME` sobre una propuesta ya ejecutada dejaba
+mudo al bot —el webhook cortaba sin contestar y sin pasar el mensaje al
+modelo—; ahora responde el estado de la cita y sigue sin duplicar el evento.
+
+Validación: 544 y 546 pruebas aprobadas antes de cada envío. Esa misma noche el
+usuario repitió el recorrido real por WhatsApp y pasó completo, incluida la
+detección de dos borrados manuales del evento hechos en Calendar. Detalle en
+[agenda-incidente-2026-09-17.md](agenda-incidente-2026-09-17.md).
+
+No se modificaron el piloto, el portal, las memorias ni las etiquetas.
+**Pendiente:** la plantilla UTILITY sigue sin aprobarse, así que los avisos
+fuera de la ventana de 24 h no llegan.
+
 ### 15/09/2026 — Confirmación de agenda sin códigos visibles
 
 Publicado y desplegado únicamente `agente-ia`, commit
